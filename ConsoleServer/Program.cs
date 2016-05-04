@@ -17,43 +17,19 @@ namespace SocketServer
 {
     class Program
     {
-        static string StartMsg = "<@Begin_Of_Session@>";
-        static string EndMsg = "<@End_Of_Session@>";
-        const string Salt = @"ДжОнатан Билл, 
-                                который убил 
-                                медведя 
-                                в Чёрном Бору, 
-                                Джонатан Билл, 
-                                который купил 
-                                в прошлом году 
-                                кенгуру, 
-                                Джонатан Билл, 
-                                который скопил 
-                                пробок 
-                                два сундука, 
-                                Джонатан Билл, 
-                                который кормил финиками 
-                                быка, 
-                                Джонатан Билл, 
-                                который лечил 
-                                ячмень 
-                                на левом глазу, 
-                                Джонатан Билл, 
-                                который учил 
-                                петь по нотам 
-                                козу, 
-                                Джонатан Билл, 
-                                который уплыл 
-                                в Индию 
-                                к тётушке Трот, — 
-                                ТАК ВОТ 
-                                этот самый Джонатан Билл 
-                                очень любил компот. ";
-
         //Команды от клиента в нулевой строке
         const string Search_Mol = "<@Search_Molecule@>";
         const string Add_User = "<@Add_User@>";
         const string Add_Mol = "<@Add_Molecule@>";
+        const string Login = "<@Login_User@>";
+        // Служебные команды
+        const string All_Users = "<@Show_All_Users@>";
+
+        // Ответные команды
+        const string LoginOK = "<@Login_OK@>";
+        const string LoginExp = "<@Login_Expired@>";
+        const string StartMsg = "<@Begin_Of_Session@>";
+        const string EndMsg = "<@End_Of_Session@>";
 
         // Параметры БД
         static string DB_Server = "127.0.0.1";
@@ -62,11 +38,17 @@ namespace SocketServer
         static string DB_Pass = "Yrjksorybakpetudomgztyu73ju96m";
 
         //Объекты БД
-        static MySqlConnectionStringBuilder mysqlCSB;
-        static MySqlConnection con;
+        public static MySqlConnectionStringBuilder mysqlCSB;
+        public static MySqlConnection con;
 
         // Ключ и вектор для шифрования
         static AES_Data CommonAES;
+
+        // Список активных пользователей
+        static List<User> Active_Users = new List<User>();
+
+        // Время бездействия пользователя до принудительного выхода
+        const int UserTimeOut = 3600;
 
         static void SendMsg(Socket handler, string Msg)
         {
@@ -87,6 +69,11 @@ namespace SocketServer
                 con.ConnectionString = mysqlCSB.ConnectionString;
             }
 
+        }
+
+        public static void ConOpen()
+        {
+            if (con.State == ConnectionState.Closed) { con.Open(); };
         }
 
         // Определение прав на выдачу результатов для пользователя
@@ -135,7 +122,7 @@ namespace SocketServer
         }
 
         // Поиск по подструктуре из БД с расшифровкой
-        static List<string> Get_Mol(string Sub_Mol)
+        static List<string> Get_Mol(string Sub_Mol, User CurUser)
         {
             //Создаём новые объекты
             List<string> Result = new List<string>(); //Список вывода
@@ -145,7 +132,7 @@ namespace SocketServer
             string queryString = @"SELECT `id`, `name`, `laboratory`, `person`, `b_structure`, `state`,
 `melting_point`, `conditions`, `other_properties`, `mass`, `solution` ";
             queryString += "\nFROM `molecules` \n";
-            queryString += "WHERE " + GetQueryRights();
+            queryString += "WHERE " + CurUser.GetSearchRermissions();
 
             // Создание команды MySQL
             MySqlCommand com = new MySqlCommand(queryString, con);
@@ -275,10 +262,10 @@ namespace SocketServer
             if (Vec.Count > 0) { return true; } else { return false; }; //Возвращаем результат
         }
 
-        static void Search_Molecules(Socket handler,  string Mol)
+        static void Search_Molecules(Socket handler, User CurUser,  string Mol)
         {
             // Запрашиваем поиск по БД
-            List<string> Result = Get_Mol(Mol);
+            List<string> Result = Get_Mol(Mol, CurUser);
 
             // Отправляем ответ клиенту\
             SendMsg(handler, StartMsg);
@@ -289,40 +276,17 @@ namespace SocketServer
             SendMsg(handler, EndMsg);
         }
 
-        static string getMd5Hash(string input)
+        static void Add_User_to_DB(Socket handler, User CurUser, string UserName, string Password)
         {
-            // создаем объект этого класса. Отмечу, что он создается не через new, а вызовом метода Create
-            MD5 md5Hasher = MD5.Create();
-
-            // Преобразуем входную строку в массив байт и вычисляем хэш
-            byte[] data = md5Hasher.ComputeHash(Encoding.Default.GetBytes(input));
-
-            // Создаем новый Stringbuilder (Изменяемую строку) для набора байт
-            StringBuilder sBuilder = new StringBuilder();
-
-            // Преобразуем каждый байт хэша в шестнадцатеричную строку
-            for (int i = 0; i < data.Length; i++)
+            if (CurUser.GetUserAddRermissions())
             {
-                //указывает, что нужно преобразовать элемент в шестнадцатиричную строку длиной в два символа
-                sBuilder.Append(data[i].ToString("x2"));
+                User NewUser = new User(UserName, Password, "–", "–", UserName, 0, "1", "1", con);
+                SendMsg(handler, StartMsg);
+                SendMsg(handler, "Add_User: done");
+                SendMsg(handler, EndMsg);
             }
-            return sBuilder.ToString();
-        }
-
-        static void Add_User_to_DB(Socket handler, string User, string Password)
-        {
-
-            string MD5_Pass = getMd5Hash(Password + Salt);
-
-            string queryString = "INSERT INTO `persons` (`name`, `fathers_name`, `surname`, `laboratory`, `permissions`, `login`, `password`)\n";
-            queryString += "VALUES ('–', '–', '"+User+"', 1, 0, '"+ User + "', '"+ MD5_Pass + "');";
-
-            MySqlCommand com = new MySqlCommand(queryString, con);
-            con.Open();
-            com.ExecuteNonQuery();
-            con.Close();
             SendMsg(handler, StartMsg);
-            SendMsg(handler, "Add_User: done");
+            SendMsg(handler, "Add_User: No permissions");
             SendMsg(handler, EndMsg);
         }
 
@@ -415,8 +379,16 @@ namespace SocketServer
         }
 
         // Кодирует структуры заданным ключом. ADMIN ONLY
-        static void EncryptAll(Socket handler)
+        static void EncryptAll(Socket handler, User CurUser)
         {
+            if (!CurUser.GetAdminRermissions())
+            {
+                SendMsg(handler, StartMsg);
+                SendMsg(handler, "ERROR: Access denied!");
+                SendMsg(handler, EndMsg);
+                return;
+            }
+
             DataTable dt = new DataTable();
 
             string queryString = "SELECT `id`, `name`, `IUPAC`, `structure`\n";
@@ -470,7 +442,7 @@ WHERE `id` = " + dt.Rows[i].ItemArray[0].ToString();
             return "NULL";
         }
 
-        static void AddMolecule(Socket handler, string[] Data)
+        static void AddMolecule(Socket handler, User CurUser, string[] Data)
         {
             string queryString = @"INSERT INTO `molecules` 
 (`name`, `laboratory`, `person`, `b_structure`, `state`, `melting_point`, `conditions`, `other_properties`, `mass`, `solution`)
@@ -478,28 +450,47 @@ VALUES (@Name, @Laboratory, @Person, @Structure, @State, @MeltingPoint, @Conditi
 
             MySqlCommand com = new MySqlCommand(queryString, con);
             con.Open();
-            com.Parameters.AddWithValue("@Name", Data[1]);
-            com.Parameters.AddWithValue("@Laboratory", Data[2]);
-            com.Parameters.AddWithValue("@Person", Data[3]);
-            com.Parameters.AddWithValue("@Structure", EncryptStringToBytesAes(Data[4],
+            com.Parameters.AddWithValue("@Name", Data[3]);
+            com.Parameters.AddWithValue("@Laboratory", Data[4]);
+            com.Parameters.AddWithValue("@Person", Data[5]);
+            com.Parameters.AddWithValue("@Structure", EncryptStringToBytesAes(Data[6],
                     CommonAES.AesKey, CommonAES.AesIV));
-            com.Parameters.AddWithValue("@State", EncryptStringToBytesAes(Data[5],
+            com.Parameters.AddWithValue("@State", EncryptStringToBytesAes(Data[7],
                     CommonAES.AesKey, CommonAES.AesIV));
-            com.Parameters.AddWithValue("@MeltingPoint", EncryptStringToBytesAes(Data[6],
+            com.Parameters.AddWithValue("@MeltingPoint", EncryptStringToBytesAes(Data[8],
                     CommonAES.AesKey, CommonAES.AesIV));
-            com.Parameters.AddWithValue("@Conditions", EncryptStringToBytesAes(Data[7],
+            com.Parameters.AddWithValue("@Conditions", EncryptStringToBytesAes(Data[9],
                     CommonAES.AesKey, CommonAES.AesIV));
-            com.Parameters.AddWithValue("@OtherProperties", EncryptStringToBytesAes(Data[8],
+            com.Parameters.AddWithValue("@OtherProperties", EncryptStringToBytesAes(Data[10],
                     CommonAES.AesKey, CommonAES.AesIV));
-            com.Parameters.AddWithValue("@Mass", EncryptStringToBytesAes(Data[9],
+            com.Parameters.AddWithValue("@Mass", EncryptStringToBytesAes(Data[11],
                     CommonAES.AesKey, CommonAES.AesIV));
-            com.Parameters.AddWithValue("@Solution", EncryptStringToBytesAes(Data[10],
+            com.Parameters.AddWithValue("@Solution", EncryptStringToBytesAes(Data[12],
                     CommonAES.AesKey, CommonAES.AesIV));
 
             com.ExecuteNonQuery();
             con.Close();
             SendMsg(handler, StartMsg);
             SendMsg(handler, "Add_Molecule: done");
+            SendMsg(handler, EndMsg);
+        }
+
+        // Проверка имени пользователя и пароля
+        static void LoginMsg(Socket handler, string _User, string _Password)
+        {
+            if (Active_Users.Find(x => x.GetLogin() == _User) != null )
+            {
+                Active_Users.RemoveAll(x => x.GetLogin() == _User);
+            };
+
+            User NewUser = new User(_User, _Password);
+            if (NewUser.GetUserID() != User.NoUserID)
+            {
+                Active_Users.Add(NewUser);
+            }
+            SendMsg(handler, StartMsg);
+            SendMsg(handler, LoginOK); 
+            SendMsg(handler, NewUser.GetUserID());
             SendMsg(handler, EndMsg);
         }
 
@@ -548,28 +539,57 @@ VALUES (@Name, @Laboratory, @Person, @Structure, @State, @MeltingPoint, @Conditi
                     // Показываем данные на консоли
                     Console.Write("Полученный текст: «" + data + "»\n\n");
 
+                    User CurUser = null;
+                    if (data_parse[0].Trim() != Login)
+                    {
+                        CurUser = GetCurUser(data_parse[1], data_parse[2]);
+                        if (CurUser == null)
+                        {
+                            SendMsg(handler, StartMsg);
+                            SendMsg(handler, LoginExp);
+                            SendMsg(handler, EndMsg);
+
+                            handler.Shutdown(SocketShutdown.Both);
+                            handler.Close();
+
+                            GC.Collect();
+                            continue;
+                        }
+                    }
+
 
                     // Обрабатываем запрос
                     switch (data_parse[0].Trim())
                     {
                         case Search_Mol:
                             {
-                                Search_Molecules(handler, data_parse[1]);
+                                Search_Molecules(handler, CurUser, data_parse[3]);
                                 break;
                             }
                         case Add_User:
                             {
-                                Add_User_to_DB(handler, data_parse[1], data_parse[2]);
+                                Add_User_to_DB(handler, CurUser, data_parse[3], data_parse[4]);
                                 break;
                             }
                         case "<@Encrypt_All@>":
                             {
-                                EncryptAll(handler);
+                                EncryptAll(handler, CurUser);
                                 break;
                             }
                         case Add_Mol:
                             {
-                                AddMolecule(handler, data_parse);
+                                AddMolecule(handler, CurUser, data_parse);
+                                break;
+                            }
+                        case Login:
+                            {
+                                LoginMsg(handler, data_parse[3], data_parse[4]);
+                                break;
+                            }
+
+                        case All_Users:
+                            {
+                                AllUsersMsg(handler, CurUser);
                                 break;
                             }
                         default:
@@ -589,6 +609,8 @@ VALUES (@Name, @Laboratory, @Person, @Structure, @State, @MeltingPoint, @Conditi
 
                     handler.Shutdown(SocketShutdown.Both);
                     handler.Close();
+
+                    GC.Collect();
                 }
             }
             catch (Exception ex)
@@ -599,6 +621,39 @@ VALUES (@Name, @Laboratory, @Person, @Structure, @State, @MeltingPoint, @Conditi
             {
                 Console.ReadLine();
             }
+        }
+
+        private static User GetCurUser(string UserName, string UserID)
+        {
+            User CurUser = Active_Users.Find(x => x.GetLogin() == UserName);
+            if (CurUser == null) { return null; };
+            if (CurUser.GetUserID() != UserID) { return null; };
+
+            if ((DateTime.Now - CurUser.GetLastUse()).TotalSeconds > UserTimeOut)
+            {
+                Active_Users.RemoveAll(x => x.GetLogin() == UserName);
+                return null;
+            }
+
+            return CurUser;
+        }
+
+        private static void AllUsersMsg(Socket handler, User CurUser)
+        {
+            if (!CurUser.GetAdminRermissions())
+            {
+                SendMsg(handler, StartMsg);
+                SendMsg(handler, "ERROR: Access denied!");
+                SendMsg(handler, EndMsg);
+                return;
+            }
+
+            SendMsg(handler, StartMsg);
+            foreach(User U in Active_Users)
+            {
+                SendMsg(handler, U.GetLogin() + " -> " + U.GetUserID());
+            }
+            SendMsg(handler, EndMsg);
         }
     }
 }

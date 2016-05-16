@@ -24,12 +24,14 @@ namespace SocketServer
         const string Login = "<@Login_User@>";
         // Служебные команды
         const string All_Users = "<@Show_All_Users@>";
+        const string ShowHash = "<@Show_Hash@>";
 
         // Ответные команды
         const string LoginOK = "<@Login_OK@>";
         const string LoginExp = "<@Login_Expired@>";
         const string StartMsg = "<@Begin_Of_Session@>";
         const string EndMsg = "<@End_Of_Session@>";
+        public const string Answer_Admin = "AdminOK";
 
         // Параметры БД
         static string DB_Server = "127.0.0.1";
@@ -284,6 +286,7 @@ namespace SocketServer
                 SendMsg(handler, StartMsg);
                 SendMsg(handler, "Add_User: done");
                 SendMsg(handler, EndMsg);
+                return;
             }
             SendMsg(handler, StartMsg);
             SendMsg(handler, "Add_User: No permissions");
@@ -491,6 +494,9 @@ VALUES (@Name, @Laboratory, @Person, @Structure, @State, @MeltingPoint, @Conditi
             SendMsg(handler, StartMsg);
             SendMsg(handler, LoginOK); 
             SendMsg(handler, NewUser.GetUserID());
+            SendMsg(handler, NewUser.GetID().ToString());
+            SendMsg(handler, NewUser.GetFullName());
+            if (NewUser.IsAdmin()) { SendMsg(handler, Answer_Admin); };
             SendMsg(handler, EndMsg);
         }
 
@@ -590,6 +596,16 @@ VALUES (@Name, @Laboratory, @Person, @Structure, @State, @MeltingPoint, @Conditi
                         case All_Users:
                             {
                                 AllUsersMsg(handler, CurUser);
+                                break;
+                            }
+                        case ShowHash:
+                            {
+                                if (!CurUser.IsAdmin()) { break; }
+
+                                string Password = data_parse[3].Trim(new char[] { "\n"[0], "\r"[0], ' ' });
+                                SendMsg(handler, StartMsg);
+                                SendMsg(handler, User.GetPasswordHash(Password));
+                                SendMsg(handler, EndMsg);
                                 break;
                             }
                         default:

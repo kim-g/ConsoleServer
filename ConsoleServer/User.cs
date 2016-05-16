@@ -29,7 +29,7 @@ namespace ConsoleServer
 
         public User(string UserName, string UserPassword)
         {
-            Login = UserName.Trim(new char[] { "\n"[0], "\r"[0], ' ' });
+            Login = UserName.Trim(new char[] { "\n"[0], "\r"[0], ' ' }).ToLower();
             Password = UserPassword.Trim(new char[] { "\n"[0], "\r"[0], ' ' });
 
             Program.ConOpen();
@@ -54,6 +54,7 @@ namespace ConsoleServer
 
             if (DT.Rows.Count == 0)  // Выводим результат
             {
+                Login = NoUserID;
                 UserID = NoUserID;
                 return;
             }
@@ -82,7 +83,7 @@ namespace ConsoleServer
             Name = _Name.Trim(new char[] { "\n"[0], "\r"[0] });
             FName = _FName.Trim(new char[] { "\n"[0], "\r"[0] });
             Surname = _Surname.Trim(new char[] { "\n"[0], "\r"[0] });
-            Login = UserName.Trim(new char[] { "\n"[0], "\r"[0], ' ' });
+            Login = UserName.Trim(new char[] { "\n"[0], "\r"[0], ' ' }).ToLower();
             Password = UserPassword.Trim(new char[] { "\n"[0], "\r"[0], ' ' });
             Laboratory = Convert.ToInt32(_Laboratory);
             Rights = _Permissions;
@@ -90,7 +91,7 @@ namespace ConsoleServer
 
             string queryString = "INSERT INTO `persons` (`name`, `fathers_name`, `surname`, `laboratory`, `permissions`, `login`, `password`)\n";
             queryString += "VALUES ('" + Name + "', '" + FName + "', '" + Surname + "', " + _Laboratory +
-                ", " + Rights + ", '" + UserName + "', '" + GetPasswordHash() + "');";
+                ", " + Rights + ", '" + Login + "', '" + GetPasswordHash() + "');";
 
             MySqlCommand com = new MySqlCommand(queryString, con);
             Program.ConOpen();
@@ -104,7 +105,12 @@ namespace ConsoleServer
             return getMd5Hash(Password + Salt);
         }
 
-        string getMd5Hash(string input)
+        public static string GetPasswordHash(string Password)
+        {
+            return getMd5Hash(Password + Salt);
+        }
+
+        static string getMd5Hash(string input)
         {
             // создаем объект этого класса. Отмечу, что он создается не через new, а вызовом метода Create
             MD5 md5Hasher = MD5.Create();
@@ -165,9 +171,7 @@ namespace ConsoleServer
 
         public bool GetUserAddRermissions()
         {
-            if (Rights == 10)
-            { return true; }
-            return false;
+            return Rights == 10;
         }
 
         public bool GetAdminRermissions()
@@ -177,6 +181,20 @@ namespace ConsoleServer
             return false;
         }
 
+        public string GetFullName()
+        {
+            return Name + " " + FName + " " + Surname;
+        }
+
+        public int GetID()
+        {
+            return ID;
+        }
+
+        public bool IsAdmin()
+        {
+            return Rights == 10;
+        }
 
         const string Salt = @"ДжОнатан Билл, 
                                 который убил 

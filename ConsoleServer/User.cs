@@ -105,6 +105,11 @@ namespace ConsoleServer
             return getMd5Hash(Password + Salt);
         }
 
+        public bool IsManager()
+        {
+            return Rights == 11;
+        }
+
         public static string GetPasswordHash(string Password)
         {
             return getMd5Hash(Password + Salt);

@@ -22,6 +22,8 @@ namespace SocketServer
         const string Add_User = "<@Add_User@>";
         const string Add_Mol = "<@Add_Molecule@>";
         const string Login = "<@Login_User@>";
+        const string Status = "<@Next_Status@>";
+        const string GetStatuses = "<@Get_Status_List@>";
         // Служебные команды
         const string All_Users = "<@Show_All_Users@>";
         const string ShowHash = "<@Show_Hash@>";
@@ -32,6 +34,7 @@ namespace SocketServer
         const string StartMsg = "<@Begin_Of_Session@>";
         const string EndMsg = "<@End_Of_Session@>";
         public const string Answer_Admin = "AdminOK";
+        public const string Answer_Manager = "ManagerOK";
 
         // Параметры БД
         static string DB_Server = "127.0.0.1";
@@ -56,6 +59,34 @@ namespace SocketServer
         {
             byte[] msg = Encoding.UTF8.GetBytes(Msg + "\n");
             handler.Send(msg);
+        }
+
+        static DataTable DB_Query(string queryString)
+        {
+            DataTable dt = new DataTable();
+            // Создание команды MySQL
+            MySqlCommand com = new MySqlCommand(queryString, con);
+
+            // Выполнение запроса
+            try
+            {
+                ConOpen();
+
+                using (MySqlDataReader dr = com.ExecuteReader())
+                {
+                    if (dr.HasRows)   
+                    {
+                        dt.Load(dr);
+                    }
+                }
+            }
+
+            catch (Exception ex)
+            {
+                Console.WriteLine(ex.Message);
+            }
+
+            return dt;
         }
 
         static void ConnectToDB()
@@ -91,15 +122,7 @@ namespace SocketServer
             List<string> Result = new List<string>();
 
             // Получение данных из БД по запросу
-            MySqlCommand Data = new MySqlCommand(Query, con);
-            DataTable DT = new DataTable();           //Таблица БД
-
-            try     // Получаем таблицу
-            {
-                using (MySqlDataReader dr = Data.ExecuteReader())
-                { if (dr.HasRows) { DT.Load(dr); } }
-            }
-            catch (Exception ex) { Result.Add(ex.Message); } // Выводим комментарий ошибки
+            DataTable DT = DB_Query(Query);
 
             if (DT.Rows.Count > 0)  // Выводим результат
             {
@@ -128,36 +151,14 @@ namespace SocketServer
         {
             //Создаём новые объекты
             List<string> Result = new List<string>(); //Список вывода
-            DataTable dt = new DataTable();           //Таблица БД
 
             //Создаём запрос на поиск
             string queryString = @"SELECT `id`, `name`, `laboratory`, `person`, `b_structure`, `state`,
-`melting_point`, `conditions`, `other_properties`, `mass`, `solution` ";
+`melting_point`, `conditions`, `other_properties`, `mass`, `solution`, `status` ";
             queryString += "\nFROM `molecules` \n";
             queryString += "WHERE " + CurUser.GetSearchRermissions();
-
-            // Создание команды MySQL
-            MySqlCommand com = new MySqlCommand(queryString, con);
-
-            // Выполнение запроса
-            try
-            {
-                con.Open();
-
-                using (MySqlDataReader dr = com.ExecuteReader())
-                {
-                    if (dr.HasRows)
-                    {
-                        dt.Load(dr);
-                    }
-                }
-            }
-
-            catch (Exception ex)
-            {
-                Console.WriteLine(ex.Message);
-            }
-
+            DataTable dt = DB_Query(queryString);
+            
             // Сравнение каждой молекулы из запроса со стандартом
             for (int i=0; i < dt.Rows.Count; i++)
             {
@@ -187,6 +188,8 @@ namespace SocketServer
                     14 -> father's name
                     15 -> surname
                     16 -> job
+                    17 -> status
+                    18+ -> Виды анализа
                     */
 
                     // Начинаем передачу данных
@@ -218,6 +221,9 @@ namespace SocketServer
                         WHERE `id`= " +
                         dt.Rows[i].ItemArray[3].ToString() + @"
                         LIMIT 1"));
+
+                    // Получение номера статуса соединения
+                    Result.Add(NotNull(dt.Rows[i].ItemArray[11].ToString().Trim("\n"[0])));
 
                     // Получение элементов анализа
                     List<string> analys = GetRows(@"SELECT `analys`.`name`, `analys`.`name_whom` 
@@ -392,30 +398,12 @@ namespace SocketServer
                 return;
             }
 
-            DataTable dt = new DataTable();
+            
 
             string queryString = "SELECT `id`, `name`, `IUPAC`, `structure`\n";
             queryString += "FROM `molecules`;";
 
-            MySqlCommand com = new MySqlCommand(queryString, con);
-
-            try
-            {
-                con.Open();
-
-                using (MySqlDataReader dr = com.ExecuteReader())
-                {
-                    if (dr.HasRows)
-                    {
-                        dt.Load(dr);
-                    }
-                }
-            }
-
-            catch (Exception ex)
-            {
-                Console.WriteLine(ex.Message);
-            }
+            DataTable dt = DB_Query(queryString);
 
             SendMsg(handler, StartMsg);
             SendMsg(handler, "OK");
@@ -497,6 +485,16 @@ VALUES (@Name, @Laboratory, @Person, @Structure, @State, @MeltingPoint, @Conditi
             SendMsg(handler, NewUser.GetID().ToString());
             SendMsg(handler, NewUser.GetFullName());
             if (NewUser.IsAdmin()) { SendMsg(handler, Answer_Admin); };
+            if (NewUser.IsManager()) { SendMsg(handler, Answer_Manager); };
+            SendMsg(handler, EndMsg);
+        }
+
+        static void SendStatusList(Socket handler)
+        {
+            List<string> Res = GetRows("SELECT * FROM `status`");
+            SendMsg(handler, StartMsg);
+            for (int i = 0; i < Res.Count; i++)
+                SendMsg(handler, Res[i]);
             SendMsg(handler, EndMsg);
         }
 
@@ -606,6 +604,11 @@ VALUES (@Name, @Laboratory, @Person, @Structure, @State, @MeltingPoint, @Conditi
                                 SendMsg(handler, StartMsg);
                                 SendMsg(handler, User.GetPasswordHash(Password));
                                 SendMsg(handler, EndMsg);
+                                break;
+                            }
+                        case GetStatuses:
+                            {
+                                SendStatusList(handler);
                                 break;
                             }
                         default:

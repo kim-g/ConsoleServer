@@ -30,6 +30,7 @@ namespace SocketServer
         // Отладочные команды
         const string SendFile = "<@*Send_File*@>";
         const string SendFileSize = "<@*Send_File_Size*@>";
+        const string GetFile = "<@*Get_File*@>";
 
         // Ответные команды
         const string LoginOK = "<@Login_OK@>";
@@ -504,6 +505,7 @@ VALUES (@Name, @Laboratory, @Person, @Structure, @State, @MeltingPoint, @Conditi
         // Отладочная программа для тестирования передачи файла
         static void SendFileTemp(Socket handler)
         {
+            SendFileSizeTemp(handler);
             string FileName = "Test.doc";
             FileStream fs = new FileStream(FileName, FileMode.Open, FileAccess.Read);
             byte[] data = new byte[fs.Length];
@@ -520,8 +522,24 @@ VALUES (@Name, @Laboratory, @Person, @Structure, @State, @MeltingPoint, @Conditi
             string FileName = "Test.doc";
             FileStream fs = new FileStream(FileName, FileMode.Open, FileAccess.Read);
 
+            byte[] msg = Encoding.UTF8.GetBytes(StartMsg + "\n" + "Test.doc" + "\n" + fs.Length.ToString() + "\n");
+            handler.Send(BitConverter.GetBytes(msg.Length));
+            handler.Send(msg);
+        }
+
+        // Отладочная программа для тестирования передачи файла
+        static void GetFileTemp(Socket handler, string FileName, string FileSize)
+        {
+            byte[] ResFile = new byte[Convert.ToInt32(FileSize)];
+            handler.Receive(ResFile);
+
+            FileStream fs = new FileStream(FileName, FileMode.Create, FileAccess.Write);
+            fs.Write(ResFile, 0, ResFile.Length);
+            fs.Flush();
+            fs.Close();
+
             SendMsg(handler, StartMsg);
-            SendMsg(handler, fs.Length.ToString());
+            SendMsg(handler, "OK");
             SendMsg(handler, EndMsg);
         }
 
@@ -560,7 +578,13 @@ VALUES (@Name, @Laboratory, @Person, @Structure, @State, @MeltingPoint, @Conditi
 
                     // Мы дождались клиента, пытающегося с нами соединиться
 
-                    byte[] bytes = new byte[1024];
+                    // Получаем длину текстового сообщения
+                    byte[] SL_Length_b = new byte[4];
+                    handler.Receive(SL_Length_b);
+                    int SL_Length = BitConverter.ToInt32(SL_Length_b, 0);
+
+                    // Получаем текстовую часть сообщения
+                    byte[] bytes = new byte[SL_Length];
                     int bytesRec = handler.Receive(bytes);
 
                     data += Encoding.UTF8.GetString(bytes, 0, bytesRec);
@@ -646,6 +670,11 @@ VALUES (@Name, @Laboratory, @Person, @Structure, @State, @MeltingPoint, @Conditi
                         case SendFileSize:
                             {
                                 SendFileSizeTemp(handler);
+                                break;
+                            }
+                        case GetFile:
+                            {
+                                GetFileTemp(handler, data_parse[3], data_parse[4]);
                                 break;
                             }
                         default:

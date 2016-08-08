@@ -27,6 +27,9 @@ namespace SocketServer
         // Служебные команды
         const string All_Users = "<@Show_All_Users@>";
         const string ShowHash = "<@Show_Hash@>";
+        // Отладочные команды
+        const string SendFile = "<@*Send_File*@>";
+        const string SendFileSize = "<@*Send_File_Size*@>";
 
         // Ответные команды
         const string LoginOK = "<@Login_OK@>";
@@ -498,6 +501,30 @@ VALUES (@Name, @Laboratory, @Person, @Structure, @State, @MeltingPoint, @Conditi
             SendMsg(handler, EndMsg);
         }
 
+        // Отладочная программа для тестирования передачи файла
+        static void SendFileTemp(Socket handler)
+        {
+            string FileName = "Test.doc";
+            FileStream fs = new FileStream(FileName, FileMode.Open, FileAccess.Read);
+            byte[] data = new byte[fs.Length];
+            fs.Read(data, 0, data.Length);
+            fs.Flush();
+            fs.Close();
+
+            handler.Send(data);
+        }
+
+        // Отладочная программа для тестирования передачи файла
+        static void SendFileSizeTemp(Socket handler)
+        {
+            string FileName = "Test.doc";
+            FileStream fs = new FileStream(FileName, FileMode.Open, FileAccess.Read);
+
+            SendMsg(handler, StartMsg);
+            SendMsg(handler, fs.Length.ToString());
+            SendMsg(handler, EndMsg);
+        }
+
         static void Main(string[] args)
         {
             // Открываем файл-ключ
@@ -609,6 +636,16 @@ VALUES (@Name, @Laboratory, @Person, @Structure, @State, @MeltingPoint, @Conditi
                         case GetStatuses:
                             {
                                 SendStatusList(handler);
+                                break;
+                            }
+                        case SendFile:
+                            {
+                                SendFileTemp(handler);
+                                break;
+                            }
+                        case SendFileSize:
+                            {
+                                SendFileSizeTemp(handler);
                                 break;
                             }
                         default:

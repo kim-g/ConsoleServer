@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using System.Text;
 using MySql.Data.MySqlClient;
+using System.Data;
 
 namespace ConsoleServer
 {
@@ -25,7 +26,7 @@ namespace ConsoleServer
 VALUES ('" + Name + "', '" + FileName + "', @Info, " + Lab.ToString() + ", " + Person.ToString() + ");";
 
             MySqlCommand com = new MySqlCommand(queryString, con);
-            con.Open();
+            if (con.State == ConnectionState.Closed) { con.Open(); };
             com.Parameters.AddWithValue("@Info", Info);
 
             com.ExecuteNonQuery();

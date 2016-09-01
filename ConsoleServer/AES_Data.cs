@@ -83,8 +83,40 @@ namespace ConsoleServer
         // Шифрует строку, используя текущие ключ и IV
         public byte[] EncryptStringToBytes(string plainText)
         {
-            // Получаем поток байтов и шифруем.
-            byte[] encrypted = EncryptBytes(Encoding.UTF8.GetBytes(plainText));
+            // Проверка аргументов
+            if (plainText == null || plainText.Length <= 0)
+                throw new ArgumentNullException("plainText");
+            if (AesKey == null || AesKey.Length <= 0)
+                throw new ArgumentNullException("Key");
+            if (AesIV == null || AesIV.Length <= 0)
+                throw new ArgumentNullException("IV");
+            byte[] encrypted;
+
+            // Создаем объект класса AES
+            // с определенным ключом and IV.
+            using (Aes aesAlg = Aes.Create())
+            {
+                aesAlg.Key = AesKey;
+                aesAlg.IV = AesIV;
+
+                // Создаем объект, который определяет основные операции преобразований.
+                ICryptoTransform encryptor = aesAlg.CreateEncryptor(aesAlg.Key, aesAlg.IV);
+
+                // Создаем поток для шифрования.
+                using (var msEncrypt = new MemoryStream())
+                {
+                    using (var csEncrypt = new CryptoStream(msEncrypt, encryptor, CryptoStreamMode.Write))
+                    {
+                        using (var swEncrypt = new StreamWriter(csEncrypt))
+                        {
+                            //Записываем в поток все данные.
+                            swEncrypt.Write(plainText);
+                        }
+                        encrypted = msEncrypt.ToArray();
+                    }
+                }
+            }
+
 
             //Возвращаем зашифрованные байты из потока памяти.
             return encrypted;

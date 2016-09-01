@@ -430,7 +430,7 @@ VALUES (@Name, @Laboratory, @Person, @Structure, @State, @MeltingPoint, @Conditi
             byte[] ResFile = new byte[Convert.ToInt32(FileSize)];
             handler.Receive(ResFile);
 
-            Files.Save(FileName, ResFile);
+            Files.Add_To_DB(con, CommonAES, FileName, FileName, ResFile, 1, 1);
 
             SendMsg(handler, StartMsg);
             SendMsg(handler, "OK");

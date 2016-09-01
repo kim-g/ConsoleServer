@@ -167,8 +167,7 @@ namespace SocketServer
             for (int i=0; i < dt.Rows.Count; i++)
             {
                 //Расшифровка
-                string Structure = DecryptStringFromBytesAes(dt.Rows[i].ItemArray[4] as byte[], 
-                    CommonAES.AesKey, CommonAES.AesIV);
+                string Structure = CommonAES.DecryptStringFromBytes(dt.Rows[i].ItemArray[4] as byte[]);
 
                 if (CheckMol(Sub_Mol, Structure))
                 {
@@ -208,10 +207,8 @@ namespace SocketServer
                     {
                         Result.Add(
                             NotNull(
-                                 DecryptStringFromBytesAes(
-                                     dt.Rows[i].ItemArray[j] as byte[],
-                                     CommonAES.AesKey,
-                                     CommonAES.AesIV)).Trim(new char[] { "\n"[0], ' ' }));
+                                 CommonAES.DecryptStringFromBytes(
+                                     dt.Rows[i].ItemArray[j] as byte[])).Trim(new char[] { "\n"[0], ' ' }));
                     }
 
 
@@ -303,94 +300,6 @@ namespace SocketServer
             SendMsg(handler, EndMsg);
         }
 
-        static byte[] EncryptStringToBytesAes(string plainText, byte[] Key, byte[] IV)
-        {
-            // Проверка аргументов
-            if (plainText == null || plainText.Length <= 0)
-                throw new ArgumentNullException("plainText");
-            if (Key == null || Key.Length <= 0)
-                throw new ArgumentNullException("Key");
-            if (IV == null || IV.Length <= 0)
-                throw new ArgumentNullException("IV");
-            byte[] encrypted;
-
-            // Создаем объект класса AES
-            // с определенным ключом and IV.
-            using (Aes aesAlg = Aes.Create())
-            {
-                aesAlg.Key = Key;
-                aesAlg.IV = IV;
-
-                // Создаем объект, который определяет основные операции преобразований.
-                ICryptoTransform encryptor = aesAlg.CreateEncryptor(aesAlg.Key, aesAlg.IV);
-
-                // Создаем поток для шифрования.
-                using (var msEncrypt = new MemoryStream())
-                {
-                    using (var csEncrypt = new CryptoStream(msEncrypt, encryptor, CryptoStreamMode.Write))
-                    {
-                        using (var swEncrypt = new StreamWriter(csEncrypt))
-                        {
-                            //Записываем в поток все данные.
-                            swEncrypt.Write(plainText);
-                        }
-                        encrypted = msEncrypt.ToArray();
-                    }
-                }
-            }
-
-
-            //Возвращаем зашифрованные байты из потока памяти.
-            return encrypted;
-
-        }
-
-        // Дешифрует массив байтов в строку
-        static string DecryptStringFromBytesAes(byte[] cipherText, byte[] Key, byte[] IV)
-        {
-            // Проверяем аргументы
-            if (cipherText == null || cipherText.Length <= 0)
-            {
-                return "";
-            };
-            if (Key == null || Key.Length <= 0)
-                throw new ArgumentNullException("Key");
-            if (IV == null || IV.Length <= 0)
-                throw new ArgumentNullException("IV");
-
-            // Строка, для хранения расшифрованного текста
-            string plaintext;
-
-            // Создаем объект класса AES,
-            // Ключ и IV
-            using (Aes aesAlg = Aes.Create())
-            {
-                aesAlg.Key = Key;
-                aesAlg.IV = IV;
-
-                // Создаем объект, который определяет основные операции преобразований.
-                ICryptoTransform decryptor = aesAlg.CreateDecryptor(aesAlg.Key, aesAlg.IV);
-
-                // Создаем поток для расшифрования.
-                using (var msDecrypt = new MemoryStream(cipherText))
-                {
-                    using (var csDecrypt = new CryptoStream(msDecrypt, decryptor, CryptoStreamMode.Read))
-                    {
-                        using (var srDecrypt = new StreamReader(csDecrypt))
-                        {
-
-                            // Читаем расшифрованное сообщение и записываем в строку
-                            plaintext = srDecrypt.ReadToEnd();
-                        }
-                    }
-                }
-
-            }
-
-            return plaintext;
-
-        }
-
         // Кодирует структуры заданным ключом. ADMIN ONLY
         static void EncryptAll(Socket handler, User CurUser)
         {
@@ -416,8 +325,7 @@ namespace SocketServer
             for (int i = 0; i < dt.Rows.Count; i++)
             {
 
-                byte[] EncryptData = EncryptStringToBytesAes(dt.Rows[i].ItemArray[3].ToString(),
-                    CommonAES.AesKey, CommonAES.AesIV);
+                byte[] EncryptData = CommonAES.EncryptStringToBytes(dt.Rows[i].ItemArray[3].ToString());
 
                 string QS = @"UPDATE `molecules` 
 SET `b_s_size` = @BS_Size, `b_structure` = @B_Strucrure 
@@ -444,27 +352,20 @@ WHERE `id` = " + dt.Rows[i].ItemArray[0].ToString();
 VALUES (@Name, @Laboratory, @Person, @Structure, @State, @MeltingPoint, @Conditions, @OtherProperties, @Mass, @Solution);";
 
             MySqlCommand com = new MySqlCommand(queryString, con);
-            con.Open();
+            ConOpen();
             com.Parameters.AddWithValue("@Name", Data[3]);
             com.Parameters.AddWithValue("@Laboratory", Data[4]);
             com.Parameters.AddWithValue("@Person", Data[5]);
-            com.Parameters.AddWithValue("@Structure", EncryptStringToBytesAes(Data[6],
-                    CommonAES.AesKey, CommonAES.AesIV));
-            com.Parameters.AddWithValue("@State", EncryptStringToBytesAes(Data[7],
-                    CommonAES.AesKey, CommonAES.AesIV));
-            com.Parameters.AddWithValue("@MeltingPoint", EncryptStringToBytesAes(Data[8],
-                    CommonAES.AesKey, CommonAES.AesIV));
-            com.Parameters.AddWithValue("@Conditions", EncryptStringToBytesAes(Data[9],
-                    CommonAES.AesKey, CommonAES.AesIV));
-            com.Parameters.AddWithValue("@OtherProperties", EncryptStringToBytesAes(Data[10],
-                    CommonAES.AesKey, CommonAES.AesIV));
-            com.Parameters.AddWithValue("@Mass", EncryptStringToBytesAes(Data[11],
-                    CommonAES.AesKey, CommonAES.AesIV));
-            com.Parameters.AddWithValue("@Solution", EncryptStringToBytesAes(Data[12],
-                    CommonAES.AesKey, CommonAES.AesIV));
+            com.Parameters.AddWithValue("@Structure", CommonAES.EncryptStringToBytes(Data[6]));
+            com.Parameters.AddWithValue("@State", CommonAES.EncryptStringToBytes(Data[7]));
+            com.Parameters.AddWithValue("@MeltingPoint", CommonAES.EncryptStringToBytes(Data[8]));
+            com.Parameters.AddWithValue("@Conditions", CommonAES.EncryptStringToBytes(Data[9]));
+            com.Parameters.AddWithValue("@OtherProperties", CommonAES.EncryptStringToBytes(Data[10]));
+            com.Parameters.AddWithValue("@Mass", CommonAES.EncryptStringToBytes(Data[11]));
+            com.Parameters.AddWithValue("@Solution", CommonAES.EncryptStringToBytes(Data[12]));
 
             com.ExecuteNonQuery();
-            con.Close();
+
             SendMsg(handler, StartMsg);
             SendMsg(handler, "Add_Molecule: done");
             SendMsg(handler, EndMsg);
@@ -507,11 +408,7 @@ VALUES (@Name, @Laboratory, @Person, @Structure, @State, @MeltingPoint, @Conditi
         {
             SendFileSizeTemp(handler);
             string FileName = "Test.doc";
-            FileStream fs = new FileStream(FileName, FileMode.Open, FileAccess.Read);
-            byte[] data = new byte[fs.Length];
-            fs.Read(data, 0, data.Length);
-            fs.Flush();
-            fs.Close();
+            byte[] data = Files.Load(FileName);
 
             handler.Send(data);
         }
@@ -527,16 +424,13 @@ VALUES (@Name, @Laboratory, @Person, @Structure, @State, @MeltingPoint, @Conditi
             handler.Send(msg);
         }
 
-        // Отладочная программа для тестирования передачи файла
+        // Отладочная программа для тестирования приёма файла
         static void GetFileTemp(Socket handler, string FileName, string FileSize)
         {
             byte[] ResFile = new byte[Convert.ToInt32(FileSize)];
             handler.Receive(ResFile);
 
-            FileStream fs = new FileStream(FileName, FileMode.Create, FileAccess.Write);
-            fs.Write(ResFile, 0, ResFile.Length);
-            fs.Flush();
-            fs.Close();
+            Files.Save(FileName, ResFile);
 
             SendMsg(handler, StartMsg);
             SendMsg(handler, "OK");

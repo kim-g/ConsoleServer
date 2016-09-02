@@ -46,9 +46,8 @@ namespace SocketServer
         static string DB_User = "Mol_Base";
         static string DB_Pass = "Yrjksorybakpetudomgztyu73ju96m";
 
-        //Объекты БД
-        public static MySqlConnectionStringBuilder mysqlCSB;
-        public static MySqlConnection con;
+        // Сама БД
+        static DB DataBase;
 
         // Ключ и вектор для шифрования
         static AES_Data CommonAES;
@@ -65,53 +64,7 @@ namespace SocketServer
             handler.Send(msg);
         }
 
-        static DataTable DB_Query(string queryString)
-        {
-            DataTable dt = new DataTable();
-            // Создание команды MySQL
-            MySqlCommand com = new MySqlCommand(queryString, con);
-
-            // Выполнение запроса
-            try
-            {
-                ConOpen();
-
-                using (MySqlDataReader dr = com.ExecuteReader())
-                {
-                    if (dr.HasRows)   
-                    {
-                        dt.Load(dr);
-                    }
-                }
-            }
-
-            catch (Exception ex)
-            {
-                Console.WriteLine(ex.Message);
-            }
-
-            return dt;
-        }
-
-        static void ConnectToDB()
-        {
-            mysqlCSB = new MySqlConnectionStringBuilder();
-            mysqlCSB.Server = DB_Server;
-            mysqlCSB.Database = DB_Name;
-            mysqlCSB.UserID = DB_User;
-            mysqlCSB.Password = DB_Pass;
-
-            using (con = new MySqlConnection())
-            {
-                con.ConnectionString = mysqlCSB.ConnectionString;
-            }
-
-        }
-
-        public static void ConOpen()
-        {
-            if (con.State == ConnectionState.Closed) { con.Open(); };
-        }
+        
 
         // Определение прав на выдачу результатов для пользователя
         static string GetQueryRights()
@@ -126,7 +79,7 @@ namespace SocketServer
             List<string> Result = new List<string>();
 
             // Получение данных из БД по запросу
-            DataTable DT = DB_Query(Query);
+            DataTable DT = DataBase.Query(Query);
 
             if (DT.Rows.Count > 0)  // Выводим результат
             {
@@ -161,7 +114,7 @@ namespace SocketServer
 `melting_point`, `conditions`, `other_properties`, `mass`, `solution`, `status` ";
             queryString += "\nFROM `molecules` \n";
             queryString += "WHERE " + CurUser.GetSearchRermissions();
-            DataTable dt = DB_Query(queryString);
+            DataTable dt = DataBase.Query(queryString);
             
             // Сравнение каждой молекулы из запроса со стандартом
             for (int i=0; i < dt.Rows.Count; i++)
@@ -241,7 +194,7 @@ namespace SocketServer
                 Console.WriteLine(Result[i]);
             }*/
 
-            con.Close();
+            DataBase.ConClose();
             return Result;
         }
 
@@ -289,7 +242,7 @@ namespace SocketServer
         {
             if (CurUser.GetUserAddRermissions())
             {
-                User NewUser = new User(UserName, Password, "–", "–", UserName, 0, "1", "1", con);
+                User NewUser = new User(UserName, Password, "–", "–", UserName, 0, "1", "1", DataBase);
                 SendMsg(handler, StartMsg);
                 SendMsg(handler, "Add_User: done");
                 SendMsg(handler, EndMsg);
@@ -316,7 +269,7 @@ namespace SocketServer
             string queryString = "SELECT `id`, `name`, `IUPAC`, `structure`\n";
             queryString += "FROM `molecules`;";
 
-            DataTable dt = DB_Query(queryString);
+            DataTable dt = DataBase.Query(queryString);
 
             SendMsg(handler, StartMsg);
             SendMsg(handler, "OK");
@@ -330,13 +283,11 @@ namespace SocketServer
                 string QS = @"UPDATE `molecules` 
 SET `b_s_size` = @BS_Size, `b_structure` = @B_Strucrure 
 WHERE `id` = " + dt.Rows[i].ItemArray[0].ToString();
-                MySqlCommand UpdCom = new MySqlCommand(QS, con);
+                MySqlCommand UpdCom = DataBase.MakeCommandObject(QS);
                 UpdCom.Parameters.AddWithValue("@BS_Size", EncryptData.Length);
                 UpdCom.Parameters.AddWithValue("@B_Strucrure", EncryptData);
                 UpdCom.ExecuteNonQuery();
             };
-
-            con.Close();
         }
 
         static string NotNullSQL(string Text)
@@ -351,8 +302,7 @@ WHERE `id` = " + dt.Rows[i].ItemArray[0].ToString();
 (`name`, `laboratory`, `person`, `b_structure`, `state`, `melting_point`, `conditions`, `other_properties`, `mass`, `solution`)
 VALUES (@Name, @Laboratory, @Person, @Structure, @State, @MeltingPoint, @Conditions, @OtherProperties, @Mass, @Solution);";
 
-            MySqlCommand com = new MySqlCommand(queryString, con);
-            ConOpen();
+            MySqlCommand com = DataBase.MakeCommandObject(queryString);
             com.Parameters.AddWithValue("@Name", Data[3]);
             com.Parameters.AddWithValue("@Laboratory", Data[4]);
             com.Parameters.AddWithValue("@Person", Data[5]);
@@ -379,7 +329,7 @@ VALUES (@Name, @Laboratory, @Person, @Structure, @State, @MeltingPoint, @Conditi
                 Active_Users.RemoveAll(x => x.GetLogin() == _User);
             };
 
-            User NewUser = new User(_User, _Password);
+            User NewUser = new User(_User, _Password, DataBase);
             if (NewUser.GetUserID() != User.NoUserID)
             {
                 Active_Users.Add(NewUser);
@@ -408,9 +358,9 @@ VALUES (@Name, @Laboratory, @Person, @Structure, @State, @MeltingPoint, @Conditi
         {
             SendFileSizeTemp(handler);
             string FileName = "Test.doc";
-            byte[] data = Files.Load(FileName);
+            Files FileToSend = Files.Load(FileName);
 
-            handler.Send(data);
+            handler.Send(FileToSend.Data);
         }
 
         // Отладочная программа для тестирования передачи файла
@@ -430,7 +380,8 @@ VALUES (@Name, @Laboratory, @Person, @Structure, @State, @MeltingPoint, @Conditi
             byte[] ResFile = new byte[Convert.ToInt32(FileSize)];
             handler.Receive(ResFile);
 
-            Files.Add_To_DB(con, CommonAES, FileName, FileName, ResFile, 1, 1);
+            Files FileToAdd = new Files(FileName, FileName, ResFile);
+            FileToAdd.Add_To_DB(DataBase, CommonAES, 1, 1);
 
             SendMsg(handler, StartMsg);
             SendMsg(handler, "OK");
@@ -456,7 +407,8 @@ VALUES (@Name, @Laboratory, @Person, @Structure, @State, @MeltingPoint, @Conditi
 
 
                 //Подключаемся к БД
-                ConnectToDB();
+                DataBase = new DB(DB_Server, DB_Name, DB_User, DB_Pass);
+                
                 Console.WriteLine("Подключение к MySQL: 127.0.0.1:3306");
 
                 Console.WriteLine("Старт сервера");

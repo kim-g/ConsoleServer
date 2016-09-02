@@ -9,7 +9,7 @@ using SocketServer;
 
 namespace ConsoleServer
 {
-    class User
+    public class User
     {
 
         string Name;
@@ -27,30 +27,13 @@ namespace ConsoleServer
 
         public const string NoUserID = "NoUserID";
 
-        public User(string UserName, string UserPassword)
+        public User(string UserName, string UserPassword, DB DataBase)
         {
             Login = UserName.Trim(new char[] { "\n"[0], "\r"[0], ' ' }).ToLower();
             Password = UserPassword.Trim(new char[] { "\n"[0], "\r"[0], ' ' });
 
-            Program.ConOpen();
-            MySqlCommand Data = new MySqlCommand("SELECT * FROM `persons` WHERE (`login` = \"" +
-                Login + "\") AND (`password` = \"" + GetPasswordHash() + "\") LIMIT 1",
-                Program.con);
-            DataTable DT = new DataTable();           //Таблица БД
-
-            try     // Получаем таблицу
-            {
-                using (MySqlDataReader dr = Data.ExecuteReader())
-                {
-                    if (dr.HasRows) { DT.Load(dr); }
-                    else
-                    {
-                        UserID = NoUserID;
-                        return;
-                    }
-                }
-            }
-            catch (Exception ex) { Console.WriteLine(ex.Message); } // Выводим комментарий ошибки
+            DataTable DT = DataBase.Query("SELECT * FROM `persons` WHERE (`login` = \"" +
+                Login + "\") AND (`password` = \"" + GetPasswordHash() + "\") LIMIT 1");
 
             if (DT.Rows.Count == 0)  // Выводим результат
             {
@@ -73,12 +56,10 @@ namespace ConsoleServer
             Rights = Convert.ToInt32(DT.Rows[0].ItemArray[5]);
             Job = DT.Rows[0].ItemArray[8] as string;
             LastUsed = DateTime.Now;
-
-            Program.con.Close();
         }
 
         public User(string UserName, string UserPassword, string _Name, string _FName, string _Surname,
-            int _Permissions, string _Laboratory, string _Job, MySqlConnection con)
+            int _Permissions, string _Laboratory, string _Job, DB DataBase)
         {
             Name = _Name.Trim(new char[] { "\n"[0], "\r"[0] });
             FName = _FName.Trim(new char[] { "\n"[0], "\r"[0] });
@@ -92,11 +73,8 @@ namespace ConsoleServer
             string queryString = "INSERT INTO `persons` (`name`, `fathers_name`, `surname`, `laboratory`, `permissions`, `login`, `password`)\n";
             queryString += "VALUES ('" + Name + "', '" + FName + "', '" + Surname + "', " + _Laboratory +
                 ", " + Rights + ", '" + Login + "', '" + GetPasswordHash() + "');";
-
-            MySqlCommand com = new MySqlCommand(queryString, con);
-            Program.ConOpen();
-            com.ExecuteNonQuery();
-            con.Close();
+            DataBase.ExecuteQuery(queryString);
+           
             LastUsed = DateTime.Now;
         }
 

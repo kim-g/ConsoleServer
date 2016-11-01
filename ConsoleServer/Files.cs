@@ -67,7 +67,7 @@ VALUES ('" + Name + "', '" + FileName + "', @Info, " + Lab.ToString() + ", " + P
             //Создаём запрос на поиск
             string queryString = @"SELECT `name`, `file_name`, `info` ";
             queryString += "\nFROM `files` \n";
-            queryString += "WHERE " + CurUser.GetSearchRermissions();
+            queryString += "WHERE `id`=" + id.ToString() + " AND " + CurUser.GetSearchRermissions();
             DataTable dt = DataBase.Query(queryString);
 
             if (dt.Rows.Count == 0) return null;

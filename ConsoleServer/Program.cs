@@ -24,12 +24,12 @@ namespace SocketServer
         const string Login = "<@Login_User@>";
         const string Status = "<@Next_Status@>";
         const string GetStatuses = "<@Get_Status_List@>";
+        const string QuitMsg = "<@*Quit*@>";
+
         // Служебные команды
         const string All_Users = "<@Show_All_Users@>";
         const string ShowHash = "<@Show_Hash@>";
-        // Отладочные команды
-        const string SendFile = "<@*Send_File*@>";
-        const string SendFileSize = "<@*Send_File_Size*@>";
+        const string SendFileMsg = "<@*Send_File*@>";
         const string GetFile = "<@*Get_File*@>";
 
         // Ответные команды
@@ -353,28 +353,24 @@ VALUES (@Name, @Laboratory, @Person, @Structure, @State, @MeltingPoint, @Conditi
             SendMsg(handler, EndMsg);
         }
 
-        // Отладочная программа для тестирования передачи файла
-        static void SendFileTemp(Socket handler)
+        // Программа для передачи файла из БД клиенту
+        static void SendFile(Socket handler, User CurUser, string FileID)
         {
-            SendFileSizeTemp(handler);
-            string FileName = "Test.doc";
-            Files FileToSend = Files.Load(FileName);
-
+            Files FileToSend = Files.Read_From_DB(DataBase, Convert.ToInt32(FileID), CurUser);
+            SendFileSize(handler, FileToSend);
             handler.Send(FileToSend.Data);
         }
 
-        // Отладочная программа для тестирования передачи файла
-        static void SendFileSizeTemp(Socket handler)
+        // Передаёт клиенту размер файла
+        static void SendFileSize(Socket handler, Files FileToSend)
         {
-            string FileName = "Test.doc";
-            FileStream fs = new FileStream(FileName, FileMode.Open, FileAccess.Read);
-
-            byte[] msg = Encoding.UTF8.GetBytes(StartMsg + "\n" + "Test.doc" + "\n" + fs.Length.ToString() + "\n");
+            byte[] msg = Encoding.UTF8.GetBytes(StartMsg + "\n" + FileToSend.FileName + "\n" + FileToSend.Data.Count().ToString() + "\n");
+            Console.WriteLine(msg.Length.ToString() + "; \"" + msg + "\"");
             handler.Send(BitConverter.GetBytes(msg.Length));
             handler.Send(msg);
         }
 
-        // Отладочная программа для тестирования приёма файла
+        // Отладочная программа для тестирования приёма файла от клиента
         static void GetFileTemp(Socket handler, string FileName, string FileSize)
         {
             byte[] ResFile = new byte[Convert.ToInt32(FileSize)];
@@ -387,6 +383,17 @@ VALUES (@Name, @Laboratory, @Person, @Structure, @State, @MeltingPoint, @Conditi
             SendMsg(handler, "OK");
             SendMsg(handler, EndMsg);
         }
+
+
+        // Выход пользователя
+        static void User_Quit(Socket handler, User CurUser)
+        {
+            Active_Users.Remove(CurUser);
+            SendMsg(handler, StartMsg);
+            SendMsg(handler, "OK");
+            SendMsg(handler, EndMsg);
+        }
+
 
         static void Main(string[] args)
         {
@@ -508,19 +515,19 @@ VALUES (@Name, @Laboratory, @Person, @Structure, @State, @MeltingPoint, @Conditi
                                 SendStatusList(handler);
                                 break;
                             }
-                        case SendFile:
+                        case SendFileMsg:
                             {
-                                SendFileTemp(handler);
-                                break;
-                            }
-                        case SendFileSize:
-                            {
-                                SendFileSizeTemp(handler);
+                                SendFile(handler, CurUser, data_parse[3]);
                                 break;
                             }
                         case GetFile:
                             {
                                 GetFileTemp(handler, data_parse[3], data_parse[4]);
+                                break;
+                            }
+                        case QuitMsg:
+                            {
+                                User_Quit(handler, CurUser);
                                 break;
                             }
                         default:
@@ -565,6 +572,9 @@ VALUES (@Name, @Laboratory, @Person, @Structure, @State, @MeltingPoint, @Conditi
                 Active_Users.RemoveAll(x => x.GetLogin() == UserName);
                 return null;
             }
+
+            // Удалим все устаревшие записи
+            Active_Users.RemoveAll(x => (DateTime.Now - x.GetLastUse()).TotalSeconds > UserTimeOut);
 
             return CurUser;
         }

@@ -14,6 +14,7 @@ namespace ConsoleServer
         public string Name;             // Название документа. Может быть любым
         public string FileName;         // Имя файла по правилам ОС
         public byte[] Data;             // Само содержимое файла
+        public Stream DataStream;           // Содержимое файла в Stream
 
         // Создаём пустую заготовку только с названием файла
         public Files(string name)
@@ -37,6 +38,8 @@ namespace ConsoleServer
             Name = name;
             FileName = filename;
             Data = info;
+            DataStream = new MemoryStream(Data);
+            DataStream.Position = 0;
         }
 
         // Сохраняем содержимое файла на диск. Требуется адрес для полного пути.

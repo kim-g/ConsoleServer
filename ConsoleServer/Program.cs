@@ -103,6 +103,19 @@ namespace SocketServer
             return Result;
         }
 
+        // NotNull без пробелов элемент из БД
+        static string FromBase(DataTable dt, int i, int j)
+        {
+            return NotNull(dt.Rows[i].ItemArray[j].ToString().Trim("\n"[0]));
+        }
+
+        // NotNull без пробелов элемент из БД
+        static string FromBaseDec(DataTable dt, int i, int j)
+        {
+            return NotNull(CommonAES.DecryptStringFromBytes(
+                dt.Rows[i].ItemArray[j] as byte[])).Trim(new char[] { "\n"[0], ' ' });
+        }
+
         // Поиск по подструктуре из БД с расшифровкой
         static List<string> Get_Mol(string Sub_Mol, User CurUser)
         {
@@ -147,52 +160,43 @@ namespace SocketServer
                     17 -> status
                     18+ -> Виды анализа
                     */
-
-                    // Начинаем передачу данных
-                    Result.Add("New molecule");
-                    // Пересылаем открытые данные
-                    for (int j = 0; j < 4; j++)
-                    {
-                        Result.Add(NotNull(dt.Rows[i].ItemArray[j].ToString().Trim("\n"[0])));
-                    }
-                    // Расшифровываем и пересылаем закодированные данные
-                    for (int j = 4; j < 11; j++)
-                    {
-                        Result.Add(
-                            NotNull(
-                                 CommonAES.DecryptStringFromBytes(
-                                     dt.Rows[i].ItemArray[j] as byte[])).Trim(new char[] { "\n"[0], ' ' }));
-                    }
-
-
-                    // Получение имени и аббривеатуры лаборатории из БД
-                    Result.AddRange(GetRows("SELECT `name`, `abbr` FROM `laboratory` WHERE `id`=" +
-                        dt.Rows[i].ItemArray[2].ToString() + " LIMIT 1"));
-
-                    // Получение ФИО и должности сотрудника из БД
-                    Result.AddRange(GetRows(@"SELECT `name`, `fathers_name`, `Surname`, `job` 
+                
+                    // Наполнение транспортного класса
+                    Molecule_Transport MT = new Molecule_Transport();
+                    MT.ID = Convert.ToInt32(FromBase(dt, i, 0));
+                    MT.Name = FromBase(dt, i, 1);
+                    MT.Laboratory = new laboratory();
+                    MT.Laboratory.ID = Convert.ToInt32(FromBase(dt, i, 2));
+                    List<string> Lab = GetRows("SELECT `name`, `abbr` FROM `laboratory` WHERE `id`=" +
+                        dt.Rows[i].ItemArray[2].ToString() + " LIMIT 1");
+                    MT.Laboratory.Name = Lab[0];
+                    MT.Laboratory.Abb = Lab[1];
+                    List<string> Per = GetRows(@"SELECT `name`, `fathers_name`, `Surname`, `job` 
                         FROM `persons` 
-                        WHERE `id`= " +
-                        dt.Rows[i].ItemArray[3].ToString() + @"
-                        LIMIT 1"));
-
-                    // Получение номера статуса соединения
-                    Result.Add(NotNull(dt.Rows[i].ItemArray[11].ToString().Trim("\n"[0])));
-
-                    // Получение элементов анализа
-                    List<string> analys = GetRows(@"SELECT `analys`.`name`, `analys`.`name_whom` 
+                        WHERE `id`= " + dt.Rows[i].ItemArray[3].ToString() + @"
+                        LIMIT 1");
+                    MT.Person = new person();
+                    MT.Person.ID = Convert.ToInt32(FromBase(dt, i, 3));
+                    MT.Person.Name = Per[0];
+                    MT.Person.FathersName = Per[1];
+                    MT.Person.Surname = Per[2];
+                    MT.Person.Job = Per[3];
+                    MT.Structure = FromBaseDec(dt, i, 4);
+                    MT.State = FromBaseDec(dt, i, 5);
+                    MT.Melting_Point = FromBaseDec(dt, i, 6);
+                    MT.Conditions = FromBaseDec(dt, i, 7);
+                    MT.Other_Properties = FromBaseDec(dt, i, 8);
+                    MT.Mass = FromBaseDec(dt, i, 9);
+                    MT.Solution = FromBaseDec(dt, i, 10);
+                    MT.Status = Convert.ToInt32(FromBase(dt, i, 11));
+                    MT.Analysis = GetRows(@"SELECT `analys`.`name`, `analys`.`name_whom` 
                         FROM `analys` 
                           INNER JOIN `analys_to_molecules` ON `analys_to_molecules`.`analys` = `analys`.`id`
                         WHERE `analys_to_molecules`.`molecule` = " + dt.Rows[i].ItemArray[0].ToString() + ";");
-                    Result.Add((analys.Count() / 2).ToString());
-                    Result.AddRange(analys);
+
+                    Result.Add(MT.ToXML());
                 }
             };
-
-            /*for (int i = 0; i < Result.Count; i++)
-            {
-                Console.WriteLine(Result[i]);
-            }*/
 
             DataBase.ConClose();
             return Result;
@@ -358,7 +362,21 @@ VALUES (@Name, @Laboratory, @Person, @Structure, @State, @MeltingPoint, @Conditi
         {
             Files FileToSend = Files.Read_From_DB(DataBase, Convert.ToInt32(FileID), CurUser);
             SendFileSize(handler, FileToSend);
-            handler.Send(FileToSend.Data);
+
+            int FtS_Size = FileToSend.Data.Count();
+            for (int i = 0; i < FtS_Size; i += 1024)
+            {
+
+                int block;
+                if (FtS_Size - i < 1024) { block = FtS_Size - i; }
+                else { block = 1024; }
+
+                byte[] buf = new byte[block];
+                FileToSend.DataStream.Read(buf, 0, block);
+                handler.Send(buf);
+            }
+
+            FileToSend.Save();
         }
 
         // Передаёт клиенту размер файла
@@ -575,6 +593,9 @@ VALUES (@Name, @Laboratory, @Person, @Structure, @State, @MeltingPoint, @Conditi
 
             // Удалим все устаревшие записи
             Active_Users.RemoveAll(x => (DateTime.Now - x.GetLastUse()).TotalSeconds > UserTimeOut);
+
+            // Продлим срок жизни пользователя. (Хе-хе-хе!)
+            CurUser.Use();
 
             return CurUser;
         }

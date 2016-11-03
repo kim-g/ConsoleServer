@@ -53,15 +53,16 @@ namespace ConsoleServer
         }
 
         // Заносит информацию о файле в БД. В будущем сделаю шифрование информации.
-        public void Add_To_DB(DB DataBase, AES_Data AES, int Lab, int Person)
+        public int Add_To_DB(DB DataBase, AES_Data AES, int Lab, int Person)
         {
             string queryString = @"INSERT INTO `files` 
 (`name`, `file_name`, `info`, `laboratory`, `person`)
-VALUES ('" + Name + "', '" + FileName + "', @Info, " + Lab.ToString() + ", " + Person.ToString() + ");";
+VALUES ('" + Name + "', '" + FileName + "', @Info, " + Lab.ToString() + ", " + Person.ToString() + @");
+SELECT LAST_INSERT_ID(); ";
 
             MySqlCommand com = DataBase.MakeCommandObject(queryString);
             com.Parameters.AddWithValue("@Info", Data);
-            com.ExecuteNonQuery();
+            return Convert.ToInt32(com.ExecuteScalar());
         }
 
         // Загружает информацию о файле из БД и создаёт новый Files объект

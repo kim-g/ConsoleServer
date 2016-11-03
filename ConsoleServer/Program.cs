@@ -25,12 +25,13 @@ namespace SocketServer
         const string Status = "<@Next_Status@>";
         const string GetStatuses = "<@Get_Status_List@>";
         const string QuitMsg = "<@*Quit*@>";
+        const string FN_msg = "<@GetFileName@>";
 
         // Служебные команды
         const string All_Users = "<@Show_All_Users@>";
         const string ShowHash = "<@Show_Hash@>";
         const string SendFileMsg = "<@*Send_File*@>";
-        const string GetFile = "<@*Get_File*@>";
+        const string GetFileMsg = "<@*Get_File*@>";
 
         // Ответные команды
         const string LoginOK = "<@Login_OK@>";
@@ -194,7 +195,25 @@ namespace SocketServer
                           INNER JOIN `analys_to_molecules` ON `analys_to_molecules`.`analys` = `analys`.`id`
                         WHERE `analys_to_molecules`.`molecule` = " + dt.Rows[i].ItemArray[0].ToString() + ";");
 
-                    Result.Add(MT.ToXML());
+                    // Добавляем список файлов
+                    MT.Files = new List<file>();
+                    //   Получаем файлы, имеющие отношение к данному соединению
+                    DataTable files = DataBase.Query(@"SELECT `file` 
+                        FROM `files_to_molecules` 
+                        WHERE `molecule` = " + dt.Rows[i].ItemArray[0].ToString() + ";");
+                    for (int f = 0; f < files.Rows.Count; f++)
+                    {
+                        file NF = new file();
+                        NF.ID = (int)files.Rows[f].ItemArray[0];
+                        DataTable NewFile = DataBase.Query(@"SELECT `name` FROM files WHERE `id`=" + 
+                            NF.ID.ToString() + @" LIMIT 1;");
+                        if (NewFile.Rows.Count == 0) { NF.Name = "Файл отсутствует"; }
+                        else { NF.Name = NewFile.Rows[0].ItemArray[0].ToString(); }
+
+                        MT.Files.Add(NF);
+                    }
+
+                        Result.Add(MT.ToXML());
                 }
             };
 
@@ -402,6 +421,36 @@ VALUES (@Name, @Laboratory, @Person, @Structure, @State, @MeltingPoint, @Conditi
             SendMsg(handler, EndMsg);
         }
 
+        // Программа для приёма файла от клиента
+        static void GetFile(Socket handler, User CurUser, string FileName, string Name, string FileSize, 
+            string MoleculeID)
+        {
+            int FileSizei = Convert.ToInt32(FileSize);
+            byte[] ResFile = new byte[FileSizei];
+
+            Stream ms = new MemoryStream();
+            for (int i=0; i < FileSizei; i += 1024)
+            {
+                int Size = 1024;
+                if (FileSizei - i < 1024) Size = FileSizei - i;
+                byte[] Block = new byte[Size];
+                handler.Receive(Block,Size,SocketFlags.None);
+                ms.Write(Block, 0, Size);
+            }
+            ms.Position = 0;
+            ms.Read(ResFile, 0, FileSizei);
+
+            Files FileToAdd = new Files(Name, FileName, ResFile);
+            int FileID = FileToAdd.Add_To_DB(DataBase, CommonAES, CurUser.GetID(), CurUser.GetLaboratory());
+            Console.WriteLine("NewID: {0}", FileID);
+
+            DataBase.ExecuteQuery(@"INSERT INTO `files_to_molecules` (`file`, `molecule`)
+VALUES ("+ FileID + ", "+ MoleculeID + ")");
+
+            SendMsg(handler, StartMsg);
+            SendMsg(handler, FileID.ToString());
+            SendMsg(handler, EndMsg);
+        }
 
         // Выход пользователя
         static void User_Quit(Socket handler, User CurUser)
@@ -538,14 +587,20 @@ VALUES (@Name, @Laboratory, @Person, @Structure, @State, @MeltingPoint, @Conditi
                                 SendFile(handler, CurUser, data_parse[3]);
                                 break;
                             }
-                        case GetFile:
+                        case GetFileMsg:
                             {
-                                GetFileTemp(handler, data_parse[3], data_parse[4]);
+                                GetFile(handler, CurUser, data_parse[3], data_parse[4], data_parse[5], 
+                                    data_parse[6]);
                                 break;
                             }
                         case QuitMsg:
                             {
                                 User_Quit(handler, CurUser);
+                                break;
+                            }
+                        case FN_msg:
+                            {
+                                GetFileName(handler, CurUser, data_parse[3]);
                                 break;
                             }
                         default:
@@ -615,6 +670,19 @@ VALUES (@Name, @Laboratory, @Person, @Structure, @State, @MeltingPoint, @Conditi
             {
                 SendMsg(handler, U.GetLogin() + " -> " + U.GetUserID());
             }
+            SendMsg(handler, EndMsg);
+        }
+
+        private static void GetFileName(Socket handler, User CurUser, string FileID)
+        {
+            DataTable NewFile = DataBase.Query(@"SELECT `file_name` FROM files WHERE `id`=" +
+                            FileID + @" LIMIT 1;");
+            string Out;
+            if (NewFile.Rows.Count == 0) { Out = "Файл отсутствует"; }
+            else { Out = NewFile.Rows[0].ItemArray[0].ToString(); }
+
+            SendMsg(handler, StartMsg);
+            SendMsg(handler, Out);
             SendMsg(handler, EndMsg);
         }
     }

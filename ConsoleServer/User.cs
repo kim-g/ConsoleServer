@@ -118,6 +118,11 @@ namespace ConsoleServer
             return UserID;
         }
 
+        public int GetLaboratory()
+        {
+            return Laboratory;
+        }
+
         public string GetLogin()
         {
             return Login;

@@ -26,6 +26,8 @@ namespace SocketServer
         const string GetStatuses = "<@Get_Status_List@>";
         const string QuitMsg = "<@*Quit*@>";
         const string FN_msg = "<@GetFileName@>";
+        const string Show_My_mol = "<@Show my molecules@>";  // Команда показать все молекулы
+        const string Increase_Status = "<@Increase status@>"; // Увеличеть значение статуса соединения
 
         // Служебные команды
         const string All_Users = "<@Show_All_Users@>";
@@ -118,7 +120,7 @@ namespace SocketServer
         }
 
         // Поиск по подструктуре из БД с расшифровкой
-        static List<string> Get_Mol(string Sub_Mol, User CurUser)
+        static List<string> Get_Mol(User CurUser, string Sub_Mol="", string Request = "Permission")
         {
             //Создаём новые объекты
             List<string> Result = new List<string>(); //Список вывода
@@ -127,98 +129,111 @@ namespace SocketServer
             string queryString = @"SELECT `id`, `name`, `laboratory`, `person`, `b_structure`, `state`,
 `melting_point`, `conditions`, `other_properties`, `mass`, `solution`, `status` ";
             queryString += "\nFROM `molecules` \n";
-            queryString += "WHERE " + CurUser.GetSearchRermissions();
+            queryString += "WHERE " + CurUser.GetPermissionsOrReqest(Request);
             DataTable dt = DataBase.Query(queryString);
-            
-            // Сравнение каждой молекулы из запроса со стандартом
-            for (int i=0; i < dt.Rows.Count; i++)
-            {
-                //Расшифровка
-                string Structure = CommonAES.DecryptStringFromBytes(dt.Rows[i].ItemArray[4] as byte[]);
 
-                if (CheckMol(Sub_Mol, Structure))
-                {
-                    /*
-                    Структура данных: (-> - Открытый, => - закодированный)
-                    -> New molecule
-                    00 -> id
-                    01 -> name
-                    02 -> laboratory
-                    03 -> person
-                    04 => b_structure
-                    05 => state
-                    06 => melting_point
-                    07 => conditions
-                    08 => other_properties
-                    09 => mass
-                    10 => solution
-                    11 -> laboratory_name
-                    12 -> laboratory_Abb
-                    13 -> name (person)
-                    14 -> father's name
-                    15 -> surname
-                    16 -> job
-                    17 -> status
-                    18+ -> Виды анализа
-                    */
+            if (Sub_Mol == "")
+            {
+                for (int i = 0; i < dt.Rows.Count; i++)
+                    Result.Add(DataRow_To_Molecule_Transport(dt, i).ToXML());
                 
-                    // Наполнение транспортного класса
-                    Molecule_Transport MT = new Molecule_Transport();
-                    MT.ID = Convert.ToInt32(FromBase(dt, i, 0));
-                    MT.Name = FromBase(dt, i, 1);
-                    MT.Laboratory = new laboratory();
-                    MT.Laboratory.ID = Convert.ToInt32(FromBase(dt, i, 2));
-                    List<string> Lab = GetRows("SELECT `name`, `abbr` FROM `laboratory` WHERE `id`=" +
-                        dt.Rows[i].ItemArray[2].ToString() + " LIMIT 1");
-                    MT.Laboratory.Name = Lab[0];
-                    MT.Laboratory.Abb = Lab[1];
-                    List<string> Per = GetRows(@"SELECT `name`, `fathers_name`, `Surname`, `job` 
+            }
+
+            else
+            {
+                // Сравнение каждой молекулы из запроса со стандартом
+                for (int i = 0; i < dt.Rows.Count; i++)
+                {
+                    //Расшифровка
+                    string Structure = CommonAES.DecryptStringFromBytes(dt.Rows[i].ItemArray[4] as byte[]);
+
+                    if (CheckMol(Sub_Mol, Structure))
+                        Result.Add(DataRow_To_Molecule_Transport(dt, i).ToXML());
+                };
+            }
+
+            DataBase.ConClose();
+            return Result;
+        }
+
+        private static Molecule_Transport DataRow_To_Molecule_Transport(DataTable dt, int i)
+        {
+            /*
+                                Структура данных: (-> - Открытый, => - закодированный)
+                                -> New molecule
+                                00 -> id
+                                01 -> name
+                                02 -> laboratory
+                                03 -> person
+                                04 => b_structure
+                                05 => state
+                                06 => melting_point
+                                07 => conditions
+                                08 => other_properties
+                                09 => mass
+                                10 => solution
+                                11 -> laboratory_name
+                                12 -> laboratory_Abb
+                                13 -> name (person)
+                                14 -> father's name
+                                15 -> surname
+                                16 -> job
+                                17 -> status
+                                18+ -> Виды анализа
+                                */
+
+            // Наполнение транспортного класса
+            Molecule_Transport MT = new Molecule_Transport();
+            MT.ID = Convert.ToInt32(FromBase(dt, i, 0));
+            MT.Name = FromBase(dt, i, 1);
+            MT.Laboratory = new laboratory();
+            MT.Laboratory.ID = Convert.ToInt32(FromBase(dt, i, 2));
+            List<string> Lab = GetRows("SELECT `name`, `abbr` FROM `laboratory` WHERE `id`=" +
+                dt.Rows[i].ItemArray[2].ToString() + " LIMIT 1");
+            MT.Laboratory.Name = Lab[0];
+            MT.Laboratory.Abb = Lab[1];
+            List<string> Per = GetRows(@"SELECT `name`, `fathers_name`, `Surname`, `job` 
                         FROM `persons` 
                         WHERE `id`= " + dt.Rows[i].ItemArray[3].ToString() + @"
                         LIMIT 1");
-                    MT.Person = new person();
-                    MT.Person.ID = Convert.ToInt32(FromBase(dt, i, 3));
-                    MT.Person.Name = Per[0];
-                    MT.Person.FathersName = Per[1];
-                    MT.Person.Surname = Per[2];
-                    MT.Person.Job = Per[3];
-                    MT.Structure = FromBaseDec(dt, i, 4);
-                    MT.State = FromBaseDec(dt, i, 5);
-                    MT.Melting_Point = FromBaseDec(dt, i, 6);
-                    MT.Conditions = FromBaseDec(dt, i, 7);
-                    MT.Other_Properties = FromBaseDec(dt, i, 8);
-                    MT.Mass = FromBaseDec(dt, i, 9);
-                    MT.Solution = FromBaseDec(dt, i, 10);
-                    MT.Status = Convert.ToInt32(FromBase(dt, i, 11));
-                    MT.Analysis = GetRows(@"SELECT `analys`.`name`, `analys`.`name_whom` 
+            MT.Person = new person();
+            MT.Person.ID = Convert.ToInt32(FromBase(dt, i, 3));
+            MT.Person.Name = Per[0];
+            MT.Person.FathersName = Per[1];
+            MT.Person.Surname = Per[2];
+            MT.Person.Job = Per[3];
+            MT.Structure = FromBaseDec(dt, i, 4);
+            MT.State = FromBaseDec(dt, i, 5);
+            MT.Melting_Point = FromBaseDec(dt, i, 6);
+            MT.Conditions = FromBaseDec(dt, i, 7);
+            MT.Other_Properties = FromBaseDec(dt, i, 8);
+            MT.Mass = FromBaseDec(dt, i, 9);
+            MT.Solution = FromBaseDec(dt, i, 10);
+            MT.Status = Convert.ToInt32(FromBase(dt, i, 11));
+            MT.Analysis = GetRows(@"SELECT `analys`.`name`, `analys`.`name_whom` 
                         FROM `analys` 
                           INNER JOIN `analys_to_molecules` ON `analys_to_molecules`.`analys` = `analys`.`id`
                         WHERE `analys_to_molecules`.`molecule` = " + dt.Rows[i].ItemArray[0].ToString() + ";");
 
-                    // Добавляем список файлов
-                    MT.Files = new List<file>();
-                    //   Получаем файлы, имеющие отношение к данному соединению
-                    DataTable files = DataBase.Query(@"SELECT `file` 
+            // Добавляем список файлов
+            MT.Files = new List<file>();
+            //   Получаем файлы, имеющие отношение к данному соединению
+            DataTable files = DataBase.Query(@"SELECT `file` 
                         FROM `files_to_molecules` 
                         WHERE `molecule` = " + dt.Rows[i].ItemArray[0].ToString() + ";");
-                    for (int f = 0; f < files.Rows.Count; f++)
-                    {
-                        file NF = new file();
-                        NF.ID = (int)files.Rows[f].ItemArray[0];
-                        DataTable NewFile = DataBase.Query(@"SELECT `name` FROM files WHERE `id`=" + 
-                            NF.ID.ToString() + @" LIMIT 1;");
-                        if (NewFile.Rows.Count == 0) { NF.Name = "Файл отсутствует"; }
-                        else { NF.Name = NewFile.Rows[0].ItemArray[0].ToString(); }
+            for (int f = 0; f < files.Rows.Count; f++)
+            {
+                file NF = new file();
+                NF.ID = (int)files.Rows[f].ItemArray[0];
+                DataTable NewFile = DataBase.Query(@"SELECT `name` FROM files WHERE `id`=" +
+                    NF.ID.ToString() + @" LIMIT 1;");
+                if (NewFile.Rows.Count == 0) { NF.Name = "Файл отсутствует"; }
+                else { NF.Name = NewFile.Rows[0].ItemArray[0].ToString(); }
 
-                        MT.Files.Add(NF);
-                    }
+                MT.Files.Add(NF);
+            }
 
-                        Result.Add(MT.ToXML());
-                }
-            };
-
-            DataBase.ConClose();
-            return Result;
+            return MT;
         }
 
         static string NotNull(string Text)
@@ -247,10 +262,10 @@ namespace SocketServer
             if (Vec.Count > 0) { return true; } else { return false; }; //Возвращаем результат
         }
 
-        static void Search_Molecules(Socket handler, User CurUser,  string Mol)
+        static void Search_Molecules(Socket handler, User CurUser,  string Mol="", string Request="Permission")
         {
             // Запрашиваем поиск по БД
-            List<string> Result = Get_Mol(Mol, CurUser);
+            List<string> Result = Get_Mol(CurUser, Mol, Request);
 
             // Отправляем ответ клиенту\
             SendMsg(handler, StartMsg);
@@ -603,6 +618,16 @@ VALUES ("+ FileID + ", "+ MoleculeID + ")");
                                 GetFileName(handler, CurUser, data_parse[3]);
                                 break;
                             }
+                        case Show_My_mol:
+                            {
+                                Search_Molecules(handler, CurUser, "", "My");
+                                break;
+                            }
+                        case Increase_Status:
+                            {
+                                IncreaseStatus(handler, CurUser, data_parse[3]);
+                                break;
+                            }
                         default:
                             {
                                 SendMsg(handler, StartMsg);
@@ -685,5 +710,43 @@ VALUES ("+ FileID + ", "+ MoleculeID + ")");
             SendMsg(handler, Out);
             SendMsg(handler, EndMsg);
         }
+
+        // Изменить статус на 1
+        private static void IncreaseStatus(Socket handler, User CurUser, string MolID)
+        {
+            DataTable MolStatus = DataBase.Query(@"SELECT `status` FROM `molecules` WHERE (`id`=" +
+                            MolID + @") AND (" + CurUser.GetSearchRermissions() +@") LIMIT 1;");
+            if (MolStatus.Rows.Count == 0)
+            {
+                SendMsg(handler, StartMsg);
+                SendMsg(handler, "ERROR 101 – Not found or access denied");
+                SendMsg(handler, EndMsg);
+                return;
+            }
+            DataTable NewStatus = DataBase.Query(@"SELECT `next` FROM `status` WHERE (`id`=" +
+                            MolStatus.Rows[0].ItemArray[0].ToString() + @") LIMIT 1;");
+            if (MolStatus.Rows.Count == 0)
+            {
+                SendMsg(handler, StartMsg);
+                SendMsg(handler, "ERROR 102 – Status not found");
+                SendMsg(handler, EndMsg);
+                return;
+            }
+            if (MolStatus.Rows[0].ItemArray[0] == null)
+            {
+                SendMsg(handler, StartMsg);
+                SendMsg(handler, "ERROR 103 – Maximum status");
+                SendMsg(handler, EndMsg);
+                return;
+            }
+
+            // Если ни одной ошибки не обнаружено, увеличиваем статус
+            DataBase.ExecuteQuery(@"UPDATE `molecules` SET `status` = " +
+                ((int)MolStatus.Rows[0].ItemArray[0] + 1).ToString() + @" WHERE `id` = " + MolID + @" LIMIT 1;");
+            SendMsg(handler, StartMsg);
+            SendMsg(handler, "OK");
+            SendMsg(handler, EndMsg);
+        }
+
     }
 }

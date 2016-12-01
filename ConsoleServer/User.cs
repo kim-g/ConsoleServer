@@ -157,6 +157,22 @@ namespace ConsoleServer
             }
         }
 
+        // Поиск своих и только своих соединений.
+        public string GetMyMolecules()
+        {
+            return "`person` = " + ID.ToString();
+        }
+
+        // Вернуть в зависимости и от разрешений, и от запроса.
+        public string GetPermissionsOrReqest(string Request)
+        {
+            if (Request == "Permission") return GetSearchRermissions();
+            if (Request == "My") return GetMyMolecules();
+
+            //Если ничего не нашли, возвращаем только свои
+            return GetMyMolecules();
+        }
+
         public bool GetUserAddRermissions()
         {
             return Rights == 10;

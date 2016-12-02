@@ -17,6 +17,9 @@ namespace SocketServer
 {
     class Program
     {
+        // Отладочные команды. Для релиза поставить FALSE
+        const bool DEBUG = true;
+
         //Команды от клиента в нулевой строке
         const string Search_Mol = "<@Search_Molecule@>";
         const string Add_User = "<@Add_User@>";
@@ -28,6 +31,7 @@ namespace SocketServer
         const string FN_msg = "<@GetFileName@>";
         const string Show_My_mol = "<@Show my molecules@>";  // Команда показать все молекулы
         const string Increase_Status = "<@Increase status@>"; // Увеличеть значение статуса соединения
+        const string Show_New_Mol = "<@Show new molecules@>";  // Команда показать все молекулы новые
 
         // Служебные команды
         const string All_Users = "<@Show_All_Users@>";
@@ -120,7 +124,7 @@ namespace SocketServer
         }
 
         // Поиск по подструктуре из БД с расшифровкой
-        static List<string> Get_Mol(User CurUser, string Sub_Mol="", string Request = "Permission")
+        static List<string> Get_Mol(User CurUser, string Sub_Mol="", string Request = "Permission", int Status = 0)
         {
             //Создаём новые объекты
             List<string> Result = new List<string>(); //Список вывода
@@ -129,7 +133,9 @@ namespace SocketServer
             string queryString = @"SELECT `id`, `name`, `laboratory`, `person`, `b_structure`, `state`,
 `melting_point`, `conditions`, `other_properties`, `mass`, `solution`, `status` ";
             queryString += "\nFROM `molecules` \n";
-            queryString += "WHERE " + CurUser.GetPermissionsOrReqest(Request);
+            queryString += "WHERE (" + CurUser.GetPermissionsOrReqest(Request) + ")";
+            if (Status > 0) queryString += " AND (`status` = " + Status.ToString() + ")"; // Добавляем статус в запрос
+
             DataTable dt = DataBase.Query(queryString);
 
             if (Sub_Mol == "")
@@ -262,10 +268,11 @@ namespace SocketServer
             if (Vec.Count > 0) { return true; } else { return false; }; //Возвращаем результат
         }
 
-        static void Search_Molecules(Socket handler, User CurUser,  string Mol="", string Request="Permission")
+        static void Search_Molecules(Socket handler, User CurUser,  string Mol="", string Request="Permission",
+            int Status = 0)
         {
             // Запрашиваем поиск по БД
-            List<string> Result = Get_Mol(CurUser, Mol, Request);
+            List<string> Result = Get_Mol(CurUser, Mol, Request, Status);
 
             // Отправляем ответ клиенту\
             SendMsg(handler, StartMsg);
@@ -628,6 +635,11 @@ VALUES ("+ FileID + ", "+ MoleculeID + ")");
                                 IncreaseStatus(handler, CurUser, data_parse[3]);
                                 break;
                             }
+                        case Show_New_Mol:
+                            {
+                                Search_Molecules(handler, CurUser, "", "Permission", 1);
+                                break;
+                            }
                         default:
                             {
                                 SendMsg(handler, StartMsg);
@@ -725,24 +737,25 @@ VALUES ("+ FileID + ", "+ MoleculeID + ")");
             }
             DataTable NewStatus = DataBase.Query(@"SELECT `next` FROM `status` WHERE (`id`=" +
                             MolStatus.Rows[0].ItemArray[0].ToString() + @") LIMIT 1;");
-            if (MolStatus.Rows.Count == 0)
+            if (NewStatus.Rows.Count == 0)
             {
                 SendMsg(handler, StartMsg);
                 SendMsg(handler, "ERROR 102 – Status not found");
                 SendMsg(handler, EndMsg);
                 return;
             }
-            if (MolStatus.Rows[0].ItemArray[0] == null)
+            if (NewStatus.Rows[0].ItemArray[0].ToString() == "-1")
             {
                 SendMsg(handler, StartMsg);
                 SendMsg(handler, "ERROR 103 – Maximum status");
                 SendMsg(handler, EndMsg);
                 return;
             }
+            if (DEBUG) Console.WriteLine(NewStatus.Rows[0].ItemArray[0]);
 
             // Если ни одной ошибки не обнаружено, увеличиваем статус
             DataBase.ExecuteQuery(@"UPDATE `molecules` SET `status` = " +
-                ((int)MolStatus.Rows[0].ItemArray[0] + 1).ToString() + @" WHERE `id` = " + MolID + @" LIMIT 1;");
+                NewStatus.Rows[0].ItemArray[0].ToString() + @" WHERE `id` = " + MolID + @" LIMIT 1;");
             SendMsg(handler, StartMsg);
             SendMsg(handler, "OK");
             SendMsg(handler, EndMsg);

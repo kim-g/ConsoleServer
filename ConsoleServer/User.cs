@@ -151,6 +151,7 @@ namespace ConsoleServer
                 case 4:
                 case 5:
                 case 10:
+                case 11:
                     return "TRUE";
                 default:
                     return "`person` = " + ID.ToString();

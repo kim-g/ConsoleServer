@@ -369,12 +369,19 @@ VALUES (@Name, @Laboratory, @Person, @Structure, @State, @MeltingPoint, @Conditi
         // Проверка имени пользователя и пароля
         static void LoginMsg(Socket handler, string _User, string _Password)
         {
-            if (Active_Users.Find(x => x.GetLogin() == _User) != null )
+            List<User> UserList = Active_Users.FindAll(x => x.GetLogin() == _User);
+            foreach (User x in UserList )
+            {
+                x.Quit(DataBase, "User Relogin");
+            }
+            
+            if (UserList != null)
             {
                 Active_Users.RemoveAll(x => x.GetLogin() == _User);
             };
 
-            User NewUser = new User(_User, _Password, DataBase);
+            User NewUser = new User(_User, _Password, DataBase, 
+                ((IPEndPoint)handler.RemoteEndPoint).Address.ToString());
             if (NewUser.GetUserID() != User.NoUserID)
             {
                 Active_Users.Add(NewUser);
@@ -477,6 +484,7 @@ VALUES ("+ FileID + ", "+ MoleculeID + ")");
         // Выход пользователя
         static void User_Quit(Socket handler, User CurUser)
         {
+            CurUser.Quit(DataBase, "User Quited");
             Active_Users.Remove(CurUser);
             SendMsg(handler, StartMsg);
             SendMsg(handler, "OK");
@@ -508,6 +516,11 @@ VALUES ("+ FileID + ", "+ MoleculeID + ")");
                 Console.WriteLine("Подключение к MySQL: 127.0.0.1:3306");
 
                 Console.WriteLine("Старт сервера");
+
+                // Завершаем все сеансы сообщением о падении сервера.
+                DataBase.ExecuteQuery(@"UPDATE `sessions` 
+                    SET `quit_date` = CURRENT_TIMESTAMP(), `reason_quit` = 'Server Fail – quit date of restart'
+                    WHERE `quit_date` IS NULL;");
 
                 // Начинаем слушать соединения
                 while (true)
@@ -679,12 +692,18 @@ VALUES ("+ FileID + ", "+ MoleculeID + ")");
 
             if ((DateTime.Now - CurUser.GetLastUse()).TotalSeconds > UserTimeOut)
             {
-                Active_Users.RemoveAll(x => x.GetLogin() == UserName);
+                CurUser.Quit(DataBase, "Time out");
+                Active_Users.Remove(CurUser);
                 return null;
             }
 
             // Удалим все устаревшие записи
-            Active_Users.RemoveAll(x => (DateTime.Now - x.GetLastUse()).TotalSeconds > UserTimeOut);
+            List<User> LU = Active_Users.FindAll(x => (DateTime.Now - x.GetLastUse()).TotalSeconds > UserTimeOut);
+            foreach (User U in LU)
+            {
+                U.Quit(DataBase, "Time out");
+                Active_Users.Remove(U);
+            }
 
             // Продлим срок жизни пользователя. (Хе-хе-хе!)
             CurUser.Use();

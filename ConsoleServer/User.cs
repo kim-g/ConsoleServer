@@ -24,10 +24,12 @@ namespace ConsoleServer
         int Laboratory;
         string Job;
         DateTime LastUsed;
+        int SessionID;
+        bool Active = true;
 
         public const string NoUserID = "NoUserID";
 
-        public User(string UserName, string UserPassword, DB DataBase)
+        public User(string UserName, string UserPassword, DB DataBase, string IP = "NOT SET")
         {
             Login = UserName.Trim(new char[] { "\n"[0], "\r"[0], ' ' }).ToLower();
             Password = UserPassword.Trim(new char[] { "\n"[0], "\r"[0], ' ' });
@@ -41,6 +43,13 @@ namespace ConsoleServer
                 UserID = NoUserID;
                 return;
             }
+
+            // Добавим в БД запись о входе с компьютера с указанным IP
+            DataBase.Query("INSERT INTO `sessions` (`user`, `ip`) VALUES (" + DT.Rows[0].ItemArray[0] as string + 
+                ", '" + IP + "')");
+
+            DataTable LR = DataBase.Query("SELECT `id` FROM `sessions` WHERE `id` = LAST_INSERT_ID()");
+            SessionID = (int)LR.Rows[0].ItemArray[0];
 
             Random Rnd = new Random();
             for (int i = 0; i<20; i++)
@@ -199,6 +208,14 @@ namespace ConsoleServer
         public bool IsAdmin()
         {
             return Rights == 10;
+        }
+
+        public void Quit(DB DataBase, string Reason)
+        {
+            DataBase.Query(@"UPDATE `sessions` 
+                SET `quit_date`=CURRENT_TIMESTAMP(), `reason_quit` = '" + Reason + @"' 
+                WHERE `id` = " + SessionID.ToString());
+            Active = false;
         }
 
         const string Salt = @"ДжОнатан Билл, 

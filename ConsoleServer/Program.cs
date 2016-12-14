@@ -549,6 +549,11 @@ VALUES ("+ FileID + ", "+ MoleculeID + ")");
                     // Показываем данные на консоли
                     Console.Write("Полученный текст: «" + data + "»\n\n");
 
+                    // Очистка ото всех уже не активных пользователей, которые почему-то не удалены из списка активных
+                    Active_Users.RemoveAll(x => x.Dead());
+
+                    // Ищем пользователя по его логину и защитной записи.
+                    // Если дана команда входа в систему, то поиск не производим.
                     User CurUser = null;
                     if (data_parse[0].Trim() != Login)
                     {
@@ -566,6 +571,28 @@ VALUES ("+ FileID + ", "+ MoleculeID + ")");
                             continue;
                         }
                     }
+
+                    // Записываем в журнал команду.
+                    // Сохраняем все переданные параметры в одну строку через перенос каретки
+                    string Params = "";
+                    for (int i = 3; i < data_parse.Count(); i++)
+                    {
+                        if (i > 3) Params += "\n";
+                        if ((data_parse[0].Trim() == Login) && (i == 4))
+                            Params += "*****";
+                        else Params += data_parse[i];
+                    }
+
+                    // И добавляем в лог
+                    string LogQuery = data_parse[0].Trim() != Login
+                        ? @"INSERT INTO `queries` (`user`, `session`,`ip`,`command`,`parameters`) 
+VALUES (" + CurUser.GetID().ToString() + ", " + CurUser.GetSessionID().ToString() +
+", '" + ((IPEndPoint)handler.RemoteEndPoint).Address.ToString() + "', '" + data_parse[0] +
+"', '" + Params + "');"
+                        : @"INSERT INTO `queries` (`ip`,`command`,`parameters`) 
+VALUES ('" + ((IPEndPoint)handler.RemoteEndPoint).Address.ToString() + "', '" + data_parse[0] +
+"', '" + Params + "');";
+                    DataBase.ExecuteQuery(LogQuery);
 
 
                     // Обрабатываем запрос

@@ -29,7 +29,7 @@ namespace ConsoleServer
 
         public const string NoUserID = "NoUserID";
 
-        public User(string UserName, string UserPassword, DB DataBase, string IP = "NOT SET")
+        public User(string UserName, string UserPassword, DB DataBase, string _IP = "NOT SET")
         {
             Login = UserName.Trim(new char[] { "\n"[0], "\r"[0], ' ' }).ToLower();
             Password = UserPassword.Trim(new char[] { "\n"[0], "\r"[0], ' ' });
@@ -46,7 +46,7 @@ namespace ConsoleServer
 
             // Добавим в БД запись о входе с компьютера с указанным IP
             DataBase.Query("INSERT INTO `sessions` (`user`, `ip`) VALUES (" + DT.Rows[0].ItemArray[0] as string + 
-                ", '" + IP + "')");
+                ", '" + _IP + "')");
 
             DataTable LR = DataBase.Query("SELECT `id` FROM `sessions` WHERE `id` = LAST_INSERT_ID()");
             SessionID = (int)LR.Rows[0].ItemArray[0];
@@ -65,6 +65,7 @@ namespace ConsoleServer
             Rights = Convert.ToInt32(DT.Rows[0].ItemArray[5]);
             Job = DT.Rows[0].ItemArray[8] as string;
             LastUsed = DateTime.Now;
+            IP = _IP;
         }
 
         public User(string UserName, string UserPassword, string _Name, string _FName, string _Surname,
@@ -216,6 +217,16 @@ namespace ConsoleServer
                 SET `quit_date`=CURRENT_TIMESTAMP(), `reason_quit` = '" + Reason + @"' 
                 WHERE `id` = " + SessionID.ToString());
             Active = false;
+        }
+
+        public int GetSessionID()
+        {
+            return SessionID;
+        }
+
+        public bool Dead()
+        {
+            return !Active;
         }
 
         const string Salt = @"ДжОнатан Билл, 

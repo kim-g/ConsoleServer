@@ -32,7 +32,7 @@ namespace SocketServer
         const string Show_My_mol = "<@Show my molecules@>";  // Команда показать все молекулы
         const string Increase_Status = "<@Increase status@>"; // Увеличеть значение статуса соединения
         const string Show_New_Mol = "<@Show new molecules@>";  // Команда показать все молекулы новые
-        const string SendFileMsg = "<@*Send_File*@>";           
+        const string SendFileMsg = "<@*Send_File*@>";
         const string GetFileMsg = "<@*Get_File*@>";
 
         // Служебные команды
@@ -41,7 +41,9 @@ namespace SocketServer
         // СК по базе
         const string LastID = "database.show_last_id";    // Показать последний использованный ID
         // СК по журналу
-        const string SessionLog = "log.sessions";    // Показать последний использованный ID
+        const string HelpLog = "log";    // Справка по использованию журнала
+        const string SessionLog = "log.sessions";    // Показать список сессий
+        const string QueryLog = "log.queries";    // Показать список запросов.
 
 
         // Ответные команды
@@ -76,7 +78,7 @@ namespace SocketServer
             handler.Send(msg);
         }
 
-        
+
 
         // Определение прав на выдачу результатов для пользователя
         static string GetQueryRights()
@@ -95,14 +97,14 @@ namespace SocketServer
 
             if (DT.Rows.Count > 0)  // Выводим результат
             {
-                for (int i=0; i<DT.Rows.Count; i++)
+                for (int i = 0; i < DT.Rows.Count; i++)
                 {
                     for (int j = 0; j < DT.Columns.Count; j++)
                     {
                         Result.Add(NotNull(DT.Rows[i].ItemArray[j].ToString().Trim("\n"[0])));
                     }
                 }
-                
+
             }
             else
             {
@@ -129,7 +131,7 @@ namespace SocketServer
         }
 
         // Поиск по подструктуре из БД с расшифровкой
-        static List<string> Get_Mol(User CurUser, string Sub_Mol="", string Request = "Permission", int Status = 0)
+        static List<string> Get_Mol(User CurUser, string Sub_Mol = "", string Request = "Permission", int Status = 0)
         {
             //Создаём новые объекты
             List<string> Result = new List<string>(); //Список вывода
@@ -147,7 +149,7 @@ namespace SocketServer
             {
                 for (int i = 0; i < dt.Rows.Count; i++)
                     Result.Add(DataRow_To_Molecule_Transport(dt, i).ToXML());
-                
+
             }
 
             else
@@ -273,7 +275,7 @@ namespace SocketServer
             if (Vec.Count > 0) { return true; } else { return false; }; //Возвращаем результат
         }
 
-        static void Search_Molecules(Socket handler, User CurUser,  string Mol="", string Request="Permission",
+        static void Search_Molecules(Socket handler, User CurUser, string Mol = "", string Request = "Permission",
             int Status = 0)
         {
             // Запрашиваем поиск по БД
@@ -314,7 +316,7 @@ namespace SocketServer
                 return;
             }
 
-            
+
 
             string queryString = "SELECT `id`, `name`, `IUPAC`, `structure`\n";
             queryString += "FROM `molecules`;";
@@ -376,11 +378,11 @@ VALUES (@Name, @Laboratory, @Person, @Structure, @State, @MeltingPoint, @Conditi
         {
             // Найдём уже залогиненных пользователей с таким же ником
             List<User> UserList = Active_Users.FindAll(x => x.GetLogin() == _User);
-            foreach (User x in UserList )       // И всех их «выйдем»
+            foreach (User x in UserList)       // И всех их «выйдем»
             {
                 x.Quit(DataBase, "User Relogin");
             }
-            
+
             // ...удалив из списка
             if (UserList != null)
             {
@@ -388,12 +390,12 @@ VALUES (@Name, @Laboratory, @Person, @Structure, @State, @MeltingPoint, @Conditi
             };
 
             // Залогинемся. Здесь происходит обращение к БД. В случае ошибки UserID будет User.NoUserID
-            User NewUser = new User(_User, _Password, DataBase, 
+            User NewUser = new User(_User, _Password, DataBase,
                 ((IPEndPoint)handler.RemoteEndPoint).Address.ToString());
 
             // Если такой пользователь есть, то добавим его в список
             if (NewUser.GetUserID() != User.NoUserID)
-                { Active_Users.Add(NewUser); }
+            { Active_Users.Add(NewUser); }
             else   // Если нет, то напишем об этом в журнал
             {
                 DataBase.ExecuteQuery("UPDATE `queries` SET `comment` = '! User name and/or pasword invalid' " +
@@ -401,7 +403,7 @@ VALUES (@Name, @Laboratory, @Person, @Structure, @State, @MeltingPoint, @Conditi
             }
 
             SendMsg(handler, StartMsg);
-            SendMsg(handler, LoginOK); 
+            SendMsg(handler, LoginOK);
             SendMsg(handler, NewUser.GetUserID());
             SendMsg(handler, NewUser.GetID().ToString());
             SendMsg(handler, NewUser.GetFullName());
@@ -465,19 +467,19 @@ VALUES (@Name, @Laboratory, @Person, @Structure, @State, @MeltingPoint, @Conditi
         }
 
         // Программа для приёма файла от клиента
-        static void GetFile(Socket handler, User CurUser, string FileName, string Name, string FileSize, 
+        static void GetFile(Socket handler, User CurUser, string FileName, string Name, string FileSize,
             string MoleculeID)
         {
             int FileSizei = Convert.ToInt32(FileSize);
             byte[] ResFile = new byte[FileSizei];
 
             Stream ms = new MemoryStream();
-            for (int i=0; i < FileSizei; i += 1024)
+            for (int i = 0; i < FileSizei; i += 1024)
             {
                 int Size = 1024;
                 if (FileSizei - i < 1024) Size = FileSizei - i;
                 byte[] Block = new byte[Size];
-                handler.Receive(Block,Size,SocketFlags.None);
+                handler.Receive(Block, Size, SocketFlags.None);
                 ms.Write(Block, 0, Size);
             }
             ms.Position = 0;
@@ -488,7 +490,7 @@ VALUES (@Name, @Laboratory, @Person, @Structure, @State, @MeltingPoint, @Conditi
             Console.WriteLine("NewID: {0}", FileID);
 
             DataBase.ExecuteQuery(@"INSERT INTO `files_to_molecules` (`file`, `molecule`)
-VALUES ("+ FileID + ", "+ MoleculeID + ")");
+VALUES (" + FileID + ", " + MoleculeID + ")");
 
             SendMsg(handler, StartMsg);
             SendMsg(handler, FileID.ToString());
@@ -526,7 +528,7 @@ VALUES ("+ FileID + ", "+ MoleculeID + ")");
 
                 //Подключаемся к БД
                 DataBase = new DB(DB_Server, DB_Name, DB_User, DB_Pass);
-                
+
                 Console.WriteLine("Подключение к MySQL: 127.0.0.1:3306");
 
                 Console.WriteLine("Старт сервера");
@@ -666,7 +668,7 @@ VALUES ('" + ((IPEndPoint)handler.RemoteEndPoint).Address.ToString() + "', '" + 
                             }
                         case GetFileMsg:
                             {
-                                GetFile(handler, CurUser, data_parse[3], data_parse[4], data_parse[5], 
+                                GetFile(handler, CurUser, data_parse[3], data_parse[4], data_parse[5],
                                     data_parse[6]);
                                 break;
                             }
@@ -704,24 +706,35 @@ VALUES ('" + ((IPEndPoint)handler.RemoteEndPoint).Address.ToString() + "', '" + 
                             }
                         case SessionLog:
                             {
-                                string[] ShowParams = new string[data_parse.Count()-3];
-                                for (int i = 3; i < data_parse.Count(); i++)
-                                    ShowParams[i-3] = data_parse[i];
-                                ShowSessionLog(handler, CurUser, ShowParams);
+                                ShowSessionLog(handler, CurUser, GetParameters(data_parse));
+                                break;
+                            }
+                        case HelpLog:
+                            {
+                                SendMsg(handler, StartMsg);
+                                SendMsg(handler, @"System logs. Shows informations aboute program usage. Possible comands:
+ - log.sessions - shows sessions history
+ - log.queries - shows query history.");
+                                SendMsg(handler, EndMsg);
+                                break;
+                            }
+                        case QueryLog:
+                            {
+                                ShowQueryLog(handler, CurUser, GetParameters(data_parse));
                                 break;
                             }
                         default:
                             {
                                 DataBase.ExecuteQuery("UPDATE `queries` SET `comment` = '! Unknown command' " +
-                                    "WHERE `id` = " +LogID.ToString() + ";");
+                                    "WHERE `id` = " + LogID.ToString() + ";");
 
                                 SendMsg(handler, StartMsg);
                                 SendMsg(handler, "Error 1: Unknown command in line 0");
                                 SendMsg(handler, EndMsg);
                                 break;
                             }
-                    } 
-                    
+                    }
+
                     if (data.IndexOf("<TheEnd>") > -1)
                     {
                         Console.WriteLine("Сервер завершил соединение с клиентом.");
@@ -742,6 +755,14 @@ VALUES ('" + ((IPEndPoint)handler.RemoteEndPoint).Address.ToString() + "', '" + 
             {
                 Console.ReadLine();
             }
+        }
+
+        private static string[] GetParameters(string[] data_parse)
+        {
+            string[] ShowParams = new string[data_parse.Count() - 3];
+            for (int i = 3; i < data_parse.Count(); i++)
+                ShowParams[i - 3] = data_parse[i];
+            return ShowParams;
         }
 
         private static User GetCurUser(string UserName, string UserID)
@@ -782,7 +803,7 @@ VALUES ('" + ((IPEndPoint)handler.RemoteEndPoint).Address.ToString() + "', '" + 
             }
 
             SendMsg(handler, StartMsg);
-            foreach(User U in Active_Users)
+            foreach (User U in Active_Users)
             {
                 SendMsg(handler, U.GetLogin() + " -> " + U.GetUserID());
             }
@@ -806,7 +827,7 @@ VALUES ('" + ((IPEndPoint)handler.RemoteEndPoint).Address.ToString() + "', '" + 
         private static void IncreaseStatus(Socket handler, User CurUser, string MolID)
         {
             DataTable MolStatus = DataBase.Query(@"SELECT `status` FROM `molecules` WHERE (`id`=" +
-                            MolID + @") AND (" + CurUser.GetSearchRermissions() +@") LIMIT 1;");
+                            MolID + @") AND (" + CurUser.GetSearchRermissions() + @") LIMIT 1;");
             if (MolStatus.Rows.Count == 0)
             {
                 SendMsg(handler, StartMsg);
@@ -849,17 +870,14 @@ VALUES ('" + ((IPEndPoint)handler.RemoteEndPoint).Address.ToString() + "', '" + 
         // Показать вывод журнала сессий
         public static void ShowSessionLog(Socket handler, User CurUser, string[] Params)
         {
-            if (!CurUser.IsAdmin())
-            {
-                SendMsg(handler, StartMsg);
-                SendMsg(handler, "Access denied");
-                SendMsg(handler, EndMsg);
-                return;
-            }
+            // Если не админ, то ничего не покажем!
+            if (!IsAdmin(handler, CurUser)) return;
 
+            // Взять всё из журнала и...
             string Query = "SELECT * FROM `sessions`";
 
-            string Person="";
+            // Инициация переменных, чтобы из if(){} нормально вышли
+            string Person = "";
             string Date = "";
             string DateRangeBegin = "";
             string DateRangeEnd = "";
@@ -867,76 +885,248 @@ VALUES ('" + ((IPEndPoint)handler.RemoteEndPoint).Address.ToString() + "', '" + 
             string Reason = "";
             string Active = "";
 
+            // Посмотрим все доп. параметры
             for (int i = 0; i < Params.Count(); i++)
             {
-                string[] Param = Params[i].ToLower().Split('=');
-                if (Param[0] == "person") Person = Param[1];
-                if (Param[0] == "date") Date = Param[1];
-                if (Param[0] == "period")
+                string[] Param = Params[i].ToLower().Split(' '); // Доп. параметр от значения отделяется пробелом
+                if (Param[0] == "person") Person = Param[1].Trim('\r'); // Для конкретного пользователя
+                if (Param[0] == "date") Date = Param[1].Trim('\r');     // Для конкретной даты
+                if (Param[0] == "period")                               // Для периода
                 {
-                    string[] dates = Param[1].Split(' ');
-                    DateRangeBegin = dates[0];
-                    DateRangeEnd = dates[1];
+                    DateRangeBegin = Param[1].Trim('\r');
+                    DateRangeEnd = Param[2].Trim('\r');
                 }
-                if (Param[0] == "limit") Limit = Param[1]; else Limit = "100";
-                if (Param[0] == "reason") Reason = Param[1];
-                if (Param[0] == "active") Active = "TRUE";
-            }
+                if (Param[0] == "limit") Limit = Param[1].Trim('\r'); else Limit = "100";   // Сколько показать
+                if (Param[0] == "reason") Reason = Param[1].Trim('\r'); // Для конкретной причины выхода
+                if (Param[0] == "active") Active = "TRUE";              // Только активных
 
-            if (Person != "" || Date != "" || DateRangeBegin != "" || Reason != "" || Active != "")
-                Query += " WHERE TRUE";
-
-            if (Person != "")
-            {
-                DataTable Name = DataBase.Query("SELECT `id` FROM `persons` WHERE `login` = '" + Person + "';");
-                if (Name.Rows.Count == 0)
+                // Служебные
+                if (Param[0] == "help")     // Помощь
                 {
                     SendMsg(handler, StartMsg);
-                    SendMsg(handler, "ERROR – UNKNOWN USER '"+ Person + "'");
+                    SendMsg(handler, @"log.sessions shows list of sessions. There are several filter parameters:
+
+ - person [login] - Show only person's sessions;
+ - date YYYY-MM-DD - Shows sessions that started or ended in this day;
+ - perood YYYY-MM-DD YYYY-MM-DD - Shows sessions in that period of time;
+ - limit [Number] - How many sessions to show. Default is 100;
+ - reason [Reason] - Shows sessions, that ended with definite reason;
+ - active - Shows only current working sessions.
+
+Parameters may be combined.");
                     SendMsg(handler, EndMsg);
                     return;
                 }
-                Query += " AND (`user` = " + Name.Rows[0].ItemArray[0].ToString() + ")";
             }
 
+            // Если есть условие выборки, добавим WHERE
+            if (Person != "" || Date != "" || DateRangeBegin != "" || Reason != "" || Active != "")
+                Query += " WHERE TRUE";
+
+            //Выберем отдельного человека
+            if (Person != "")
+            {
+                string Pers = PersonID(handler, Person);
+                if (Pers == "NoUser") return;
+                Query += " AND (`user` = " + Pers + ")";
+            }
+
+            // Выберем конкретный день
             if (Date != "")
             {
-                Query += " AND (`date` = BETWEEN '" + Date + " 00:00:00' AND '" + Date + " 23:59:59')";
+                Query += @" AND (
+    (DATE(`enter_date`) BETWEEN '" + Date + @"  00:00:00' AND '" + Date + @"  23:59:59') OR
+    (DATE(`quit_date`) BETWEEN '" + Date + @"  00:00:00' AND '" + Date + @"  23:59:59')
+)";
             }
 
+            // Выберем диапазон дат
             if (DateRangeBegin != "")
             {
-                Query += " AND (`date` = BETWEEN '" + DateRangeBegin + " 00:00:00' AND '" + DateRangeEnd + " 23:59:59')";
+                Query += @" AND (
+    (DATE(`enter_date`) BETWEEN '" + DateRangeBegin + @"  00:00:00' AND '" + DateRangeEnd + @"  23:59:59') OR
+    (DATE(`quit_date`) BETWEEN '" + DateRangeBegin + @"  00:00:00' AND '" + DateRangeEnd + @"  23:59:59')
+)";
             }
 
+            // Выберем причину выхода из системы. Зачем может понадобиться – не знаю.
             if (Reason != "")
             {
                 Query += " AND (`reason_quit` = '" + Reason + "')";
             }
 
+            // Выберем активных пользователей.
             if (Active != "")
             {
-                Query += " AND (`quit_date` IS NOT NULL)";
+                Query += " AND (`quit_date` IS NULL)";
             }
 
-            Query += " LIMIT " + Limit + ";";
+            // Добавим обратную сортировку и лимит
+            Query += " ORDER BY `id` DESC LIMIT " + Limit + ";";
 
             DataTable Res = DataBase.Query(Query);
 
+            // И отошлём всё.
             SendMsg(handler, StartMsg);
+            SendMsg(handler, "| ID\t | Start date   time  \t | End   date   time  \t | User\t | IP            \t | Reason");
+            SendMsg(handler, "|--------|-----------------------|-----------------------|-------|-----------------------|-----------------------------------");
+
+            //Server Fail – quit date of restart
+            if (Res.Rows.Count == 0) SendMsg(handler, "Results not found");
+
             for (int i = 0; i < Res.Rows.Count; i++)
             {
-                string msg = Res.Rows[i].ItemArray[0].ToString() + "\t";
-                msg += Res.Rows[i].ItemArray[1].ToString() + "\t";
-                msg += Res.Rows[i].ItemArray[2].ToString() != "" 
-                    ? Res.Rows[i].ItemArray[2].ToString() + "\t" 
-                    : "---------- --:--:--\t";
-                msg += Res.Rows[i].ItemArray[3].ToString() + "\t";
-                msg += Res.Rows[i].ItemArray[4].ToString() + "\t";
+                string msg = "| " + Res.Rows[i].ItemArray[0].ToString() + "\t | ";
+                msg += Res.Rows[i].ItemArray[1].ToString() + "\t | ";
+                msg += Res.Rows[i].ItemArray[2].ToString() != ""
+                    ? Res.Rows[i].ItemArray[2].ToString() + "\t | "
+                    : "---------- --:--:--\t | ";
+                msg += Res.Rows[i].ItemArray[3].ToString() + "\t | ";
+                msg += Res.Rows[i].ItemArray[4].ToString() + "    \t | ";
                 msg += Res.Rows[i].ItemArray[5].ToString() + "\t";
                 SendMsg(handler, msg);
             }
             SendMsg(handler, EndMsg);
+        }
+
+        // Показ журнала запросов
+        static void ShowQueryLog(Socket handler, User CurUser, string[] Params)
+        {
+            // Если не админ, то ничего не покажем!
+            if (!IsAdmin(handler, CurUser)) return;
+
+            // Взять всё из журнала и...
+            string Query = "SELECT * FROM `queries`";
+
+            // Начальная инициация переменных, чтобы из IF(){} вышли
+            string UserName = "";
+            string Session = "";
+            string IP = "";
+            string Date = "";
+            string DateBegin = "";
+            string DateEnd = "";
+            string Command = "";
+            string Parameters = "";
+            string Comment = "";
+            string Limit = "100";
+
+            // Посмотрим все доп. параметры
+            for (int i = 0; i < Params.Count(); i++)
+            {
+                string[] Param = Params[i].ToLower().Split(' '); // Доп. параметр от значения отделяется пробелом
+                if (Param[0] == "person") UserName = Param[1];      // Показать запросы конкретного человека
+                if (Param[0] == "session") Session = Param[1];      // Показать запросы в конкретной сессии
+                if (Param[0] == "ip") IP = Param[1];                // Показать запросы c конкретного IP
+                if (Param[0] == "date") Date = Param[1];            // Показать запросы в конкретный день
+                if (Param[0] == "period")                           // Показать запросы в конкретный день
+                {
+                    DateBegin = Param[1];
+                    DateEnd = Param[2];
+                }
+                if (Param[0] == "command") Command = Param[1];            // Показать запросы с конкретной командой
+                if (Param[0] == "parameter") Parameters = Param[1];       // Показать запросы с конкретным параметром (нафиг надо?!)
+                if (Param[0] == "comment") Comment = Param[1];            // Показать запросы с конкретым комментарием
+                if (Param[0] == "limit") Limit = Param[1];          // Показать конкретное число запросов
+            }
+
+            // Если есть условие выборки, добавим WHERE
+            if (UserName != "" || Session != "" || IP != "" || Date != "" || DateBegin != ""
+                || Command != "" || Parameters != "")
+                Query += " WHERE TRUE";
+
+            //Выберем отдельного человека
+            if (UserName != "")
+            {
+                string Pers = PersonID(handler, UserName);
+                if (Pers == "NoUser") return;
+                Query += " AND (`user` = " + Pers + ")";
+            }
+
+            // Выберем конкретный день
+            if (Date != "")
+            {
+                Query += @" AND (
+    (DATE(`enter_date`) BETWEEN '" + Date + @"  00:00:00' AND '" + Date + @"  23:59:59') OR
+    (DATE(`quit_date`) BETWEEN '" + Date + @"  00:00:00' AND '" + Date + @"  23:59:59')
+)";
+            }
+
+            // Выберем диапазон дат
+            if (DateBegin != "")
+            {
+                Query += @" AND (
+    (DATE(`enter_date`) BETWEEN '" + DateBegin + @"  00:00:00' AND '" + DateEnd + @"  23:59:59') OR
+    (DATE(`quit_date`) BETWEEN '" + DateBegin + @"  00:00:00' AND '" + DateEnd + @"  23:59:59')
+)";
+            }
+
+            //Выберем IP
+            if (IP != "") Query += " AND (`ip` = '" + IP + "')";
+
+            //Выберем команду
+            if (Command != "") Query += " AND (`command` = '" + Command + "')";
+
+            //Выберем параметры
+            if (Parameters != "") Query += " AND (`paremeters` LIKE '%" + Parameters + "%')";
+
+            //Выберем коммент
+            if (Parameters != "") Query += " AND (`comment` LIKE '%" + Comment + "%')";
+
+            // Добавим обратную сортировку и лимит
+            Query += " ORDER BY `id` DESC LIMIT " + Limit + ";";
+
+            DataTable Res = DataBase.Query(Query);
+
+            // И пошлём всё пользователю.
+            SendMsg(handler, StartMsg);
+            SendMsg(handler, "| ID\t | Start date   time  \t | End   date   time  \t | User\t | IP            \t | Reason");
+            SendMsg(handler, "|--------|-----------------------|-----------------------|-------|-----------------------|-----------------------------------");
+
+            //Server Fail – quit date of restart
+            if (Res.Rows.Count == 0) SendMsg(handler, "Results not found");
+
+            for (int i = 0; i < Res.Rows.Count; i++)
+            {
+                string msg = "| " + Res.Rows[i].ItemArray[0].ToString() + "\t | ";
+                msg += Res.Rows[i].ItemArray[1].ToString() + "\t | ";
+                msg += Res.Rows[i].ItemArray[2].ToString() != ""
+                    ? Res.Rows[i].ItemArray[2].ToString() + "\t | "
+                    : "---------- --:--:--\t | ";
+                msg += Res.Rows[i].ItemArray[3].ToString() + "\t | ";
+                msg += Res.Rows[i].ItemArray[4].ToString() + "    \t | ";
+                msg += Res.Rows[i].ItemArray[5].ToString() + "\t |";
+                msg += Res.Rows[i].ItemArray[6].ToString() + "\t |";
+                msg += Res.Rows[i].ItemArray[7].ToString() + "\t |";
+                SendMsg(handler, msg);
+            }
+            SendMsg(handler, EndMsg);
+        }
+
+        public static bool IsAdmin(Socket handler, User CurUser)
+        {
+            // Если не админ, то ничего не покажем!
+            if (!CurUser.IsAdmin())
+            {
+                SendMsg(handler, StartMsg);
+                SendMsg(handler, "Access denied");
+                SendMsg(handler, EndMsg);
+                return false;
+
+            }
+            return true;
+        }
+
+        public static string PersonID(Socket handler, string Name)
+        {
+            int Num = User.GetIDByLogin(DataBase, Name);
+            if (Num == -1)
+            {
+                SendMsg(handler, StartMsg);
+                SendMsg(handler, "ERROR – UNKNOWN USER '" + Name + "'");
+                SendMsg(handler, EndMsg);
+                return "NoUser";
+            }
+            return Num.ToString();
         }
 
     }

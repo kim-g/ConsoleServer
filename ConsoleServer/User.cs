@@ -228,6 +228,15 @@ namespace ConsoleServer
             return !Active;
         }
 
+        public static int GetIDByLogin(DB DataBase, string Login)
+        {
+            DataTable Name = DataBase.Query("SELECT `id` FROM `persons` WHERE `login` = '" + Login + "';");
+
+            // Проверим, есть ли человек с таким ником и найдём его ID
+            if (Name.Rows.Count == 0) return -1;
+            return Convert.ToInt32(Name.Rows[0].ItemArray[0]);
+        }
+
         const string Salt = @"ДжОнатан Билл, 
                                 который убил 
                                 медведя 

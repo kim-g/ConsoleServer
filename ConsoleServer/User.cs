@@ -35,7 +35,7 @@ namespace ConsoleServer
             Password = UserPassword.Trim(new char[] { "\n"[0], "\r"[0], ' ' });
 
             DataTable DT = DataBase.Query("SELECT * FROM `persons` WHERE (`login` = \"" +
-                Login + "\") AND (`password` = \"" + GetPasswordHash() + "\") LIMIT 1");
+                Login + "\") AND (`password` = \"" + GetPasswordHash() + "\") AND `active`=1 LIMIT 1");
 
             if (DT.Rows.Count == 0)  // Выводим результат
             {
@@ -190,9 +190,7 @@ namespace ConsoleServer
 
         public bool GetAdminRermissions()
         {
-            if (Rights == 10)
-            { return true; }
-            return false;
+            return Rights == 10;
         }
 
         public string GetFullName()
@@ -230,12 +228,37 @@ namespace ConsoleServer
 
         public static int GetIDByLogin(DB DataBase, string Login)
         {
-            DataTable Name = DataBase.Query("SELECT `id` FROM `persons` WHERE `login` = '" + 
-                Login.Trim('\r').Trim('\n').Trim() + "';");
+            DataTable Name = DataBase.Query("SELECT `id` FROM `persons` WHERE (`login` = '" + 
+                Login.Trim('\r').Trim('\n').Trim() + "') AND `active`=1;");
 
             // Проверим, есть ли человек с таким ником и найдём его ID
             if (Name.Rows.Count == 0) return -1;
             return Convert.ToInt32(Name.Rows[0].ItemArray[0]);
+        }
+
+        public string GetSurname()
+        {
+            return Surname != null ? Surname : "";
+        }
+
+        public string GetName()
+        {
+            return Name != null ? Name : "";
+        }
+
+        public string GetFathersName()
+        {
+            return FName != null ? FName : ""; 
+        }
+
+        public string GetJob()
+        {
+            return Job != null ? Job : "";
+        }
+
+        public int GetPermissionsInt()
+        {
+            return Rights;
         }
 
         const string Salt = @"ДжОнатан Билл, 

@@ -46,6 +46,11 @@ namespace SocketServer
         const string HelpLog = "log";    // Справка по использованию журнала
         const string SessionLog = "log.sessions";    // Показать список сессий
         const string QueryLog = "log.queries";    // Показать список запросов.
+        // СК по пользователям
+        const string HelpUsers = "users";   // Справка по командам со списком пользователей.
+        const string UsersList = "users.list";  // Вывод всех пользователей
+        const string ActiveUsersList = "users.active";  // Вывод залогиненных пользователей
+        const string UsersAdd = "users.add";  // Добавление нового пользователя через консоль
 
 
         // Ответные команды
@@ -743,6 +748,36 @@ VALUES ('" + ((IPEndPoint)handler.RemoteEndPoint).Address.ToString() + "', '" + 
                                 ShowQueryLog(handler, CurUser, GetParameters(data_parse));
                                 break;
                             }
+
+                        case HelpUsers:
+                            {
+                                SendMsg(handler, StartMsg);
+                                SendMsg(handler, @"List of users. Helps to manage user list. Possible comands:
+ - users.list - shows all users;
+ - users.active - shows currently logged in users;
+ - users.add - Adds new user
+ - users.update - changes user information
+ - users.password - changes user's password
+ - users.remove - delete user. May be reversible;
+ - users.rmrf - delete the user's record. Irreversable.");
+                                SendMsg(handler, EndMsg);
+                                break;
+                            }
+                        case UsersList:
+                            {
+                                ShowUsersList(handler, CurUser, GetParameters(data_parse));
+                                break;
+                            }
+                        case ActiveUsersList:
+                            {
+                                ShowActiveUsersList(handler, CurUser, GetParameters(data_parse));
+                                break;
+                            }
+                        case UsersAdd:
+                            {
+                                AddUser(handler, CurUser, GetParameters(data_parse));
+                                break;
+                            }
                         default:
                             {
                                 DataBase.ExecuteQuery("UPDATE `queries` SET `comment` = '! Unknown command' " +
@@ -894,7 +929,9 @@ VALUES ('" + ((IPEndPoint)handler.RemoteEndPoint).Address.ToString() + "', '" + 
             if (!IsAdmin(handler, CurUser)) return;
 
             // Взять всё из журнала и...
-            string Query = "SELECT * FROM `sessions`";
+            string Query = @"SELECT `sessions`.`id`, `enter_date`,`quit_date`, `persons`.`login`, `ip`, `reason_quit` 
+FROM `sessions`
+INNER JOIN `persons` ON (`persons`.`id` = `sessions`.`user`)";
 
             // Инициация переменных, чтобы из if(){} нормально вышли
             string Person = "";
@@ -1003,8 +1040,8 @@ Parameters may be combined.");
             // И отошлём всё.
             SendMsg(handler, StartMsg);
             SendMsg(handler, Query);
-            SendMsg(handler, "| ID\t | Start date   time  \t | End   date   time  \t | User\t | IP            \t | Reason");
-            SendMsg(handler, "|--------|-----------------------|-----------------------|-------|-----------------------|-----------------------------------");
+            SendMsg(handler, "| ID\t | Start date   time  \t | End   date   time  \t | User            | IP              | Reason");
+            SendMsg(handler, "|--------|-----------------------|-----------------------|-----------------|-----------------|-----------------------------------");
 
             //Server Fail – quit date of restart
             if (Res.Rows.Count == 0) SendMsg(handler, "Results not found");
@@ -1012,12 +1049,14 @@ Parameters may be combined.");
             for (int i = 0; i < Res.Rows.Count; i++)
             {
                 string msg = "| " + Res.Rows[i].ItemArray[0].ToString() + "\t | ";
-                msg += Res.Rows[i].ItemArray[1].ToString() + "\t | ";
+                msg += Res.Rows[i].ItemArray[1].ToString().Replace("\n","").Replace("\r", "") + "\t | ";
                 msg += Res.Rows[i].ItemArray[2].ToString() != ""
                     ? Res.Rows[i].ItemArray[2].ToString() + "\t | "
                     : "---------- --:--:--\t | ";
-                msg += Res.Rows[i].ItemArray[3].ToString() + "\t | ";
-                msg += Res.Rows[i].ItemArray[4].ToString() + "    \t | ";
+                msg += Res.Rows[i].ItemArray[3].ToString() +
+                    new String(' ', 15 - Res.Rows[i].ItemArray[3].ToString().Length) + " | ";
+                msg += Res.Rows[i].ItemArray[4].ToString() +
+                    new String(' ', 15 - Res.Rows[i].ItemArray[4].ToString().Length) + " | ";
                 msg += Res.Rows[i].ItemArray[5].ToString() + "\t";
                 SendMsg(handler, msg);
             }
@@ -1186,5 +1225,197 @@ Parameters may be combined.");
             return Num.ToString();
         }
 
+        // Показ всех пользователей
+        static void ShowUsersList(Socket handler, User CurUser, string[] Params)
+        {
+            // Если не админ, то ничего не покажем!
+            if (!IsAdmin(handler, CurUser)) return;
+
+            // Взять всё из журнала и...
+            string Query = @"SELECT `persons`.`id`, `Surname`, `persons`.`name`, `fathers_name`, `laboratory`.`abbr`, `job`, `Permissions`, `login`  
+FROM `persons` 
+INNER JOIN `laboratory` ON (`laboratory`.`id` = `persons`.`laboratory`)";
+
+            // Начальная инициация переменных, чтобы из IF(){} вышли
+            string Surname = "";
+            string Laboratory = "";
+            string Permissions = "";
+            string Login = "";
+            string Limit = "100";
+
+            // Посмотрим все доп. параметры
+            for (int i = 0; i < Params.Count(); i++)
+            {
+                string[] Param = Params[i].ToLower().Split(' '); // Доп. параметр от значения отделяется пробелом
+                if (Param[0] == "surname") Surname = Param[1].Replace("\n", "").Replace("\r", "");          // Показать пользователей по фамилии
+                if (Param[0] == "laboratory") Laboratory = Param[1].Replace("\n", "").Replace("\r", "");    // Показать пользователей по лаборатории
+                if (Param[0] == "permissions") Permissions = Param[1].Replace("\n", "").Replace("\r", "");   // Показать пользователей по правам
+                if (Param[0] == "login") Login = Param[1].Replace("\n", "").Replace("\r", "");              // Показать пользователей по логину
+                if (Param[0] == "limit") Limit = Param[1].Replace("\n", "").Replace("\r", "");              // Показать конкретное число пользователей
+
+                // Служебные
+                if (Param[0] == "help")     // Помощь
+                {
+                    SendMsg(handler, StartMsg);
+                    SendMsg(handler, @"user.list shows list of all users on the server. There are several filter parameters:
+
+ - surname [Name] - Show persons with surname containings [Name];
+ - laboratory [ABB] - Shows persons of this laboratory;
+ - permissions [Number] - Shows persons with certain permissions;
+ - limit [Number] - How many persons to show. Default is 100;
+ - login [Name] - Show persons with login containings [Name];
+
+Parameters may be combined.");
+                    SendMsg(handler, EndMsg);
+                    return;
+                }
+            }
+
+            // WHERE будет всегда – показываем только неудалённых
+                Query += "\nWHERE (`active` = 1)";
+
+            //Выберем по фамилии
+            if (Surname != "") Query += " AND (`Surname` LIKE '%" + Surname + "%')";
+
+            //Выберем по лаборатории
+            if (Laboratory != "") Query += " AND (`laboratory`.`abbr` LIKE '%" + Laboratory + "%')";
+
+            //Выберем по разрешениям
+            if (Permissions != "") Query += " AND (`permissions` = " + Permissions + ")";
+
+            //Выберем по логину
+            if (Login != "") Query += " AND (`login` LIKE '%" + Login + "%')";
+
+
+            // Добавим обратную сортировку и лимит
+            Query += "\nORDER BY `Surname`\nLIMIT " + Limit + ";";
+
+            DataTable Res = DataBase.Query(Query);
+
+            // И пошлём всё пользователю.
+            SendMsg(handler, StartMsg);
+            SendMsg(handler, "| ID     | Surname              | Name                 | Second Name          | login           | Lab.  | Job        | Perm. |");
+            SendMsg(handler, "|--------|----------------------|----------------------|----------------------|-----------------|-------|------------|-------|");
+
+            //Server Fail – quit date of restart
+            if (Res.Rows.Count == 0) SendMsg(handler, "Results not found");
+
+            for (int i = 0; i < Res.Rows.Count; i++)
+            {
+                string msg = "| " + Res.Rows[i].ItemArray[0].ToString() + "\t | ";
+                msg += Res.Rows[i].ItemArray[1].ToString() +
+                    new String(' ', 20 - Res.Rows[i].ItemArray[1].ToString().Length) + " | ";
+                msg += Res.Rows[i].ItemArray[2].ToString() +
+                    new String(' ', 20 - Res.Rows[i].ItemArray[2].ToString().Length) + " | ";
+                msg += Res.Rows[i].ItemArray[3].ToString() +
+                    new String(' ', 20 - Res.Rows[i].ItemArray[3].ToString().Length) + " | ";
+                msg += Res.Rows[i].ItemArray[7].ToString() +
+                    new String(' ', 15 - Res.Rows[i].ItemArray[7].ToString().Length) + " | ";
+                msg += Res.Rows[i].ItemArray[4].ToString() +
+                    new String(' ', 5 - Res.Rows[i].ItemArray[4].ToString().Length) + " | ";
+                msg += Res.Rows[i].ItemArray[5].ToString() +
+                    new String(' ', 10 - Res.Rows[i].ItemArray[5].ToString().Length) + " | ";
+                msg += Res.Rows[i].ItemArray[6].ToString() +
+                    new String(' ', 5 - Res.Rows[i].ItemArray[6].ToString().Length) + " | ";
+                SendMsg(handler, msg);
+            }
+            SendMsg(handler, EndMsg);
+        }
+
+        // Показать всех залогиненых пользователей
+        static void ShowActiveUsersList(Socket handler, User CurUser, string[] Params)
+        {
+            // Если не админ, то ничего не покажем!
+            if (!IsAdmin(handler, CurUser)) return;
+
+            SendMsg(handler, StartMsg);
+            foreach (User U in Active_Users)
+            {
+                string msg = "| " + U.GetID().ToString() +
+                    new string(' ', 5 - U.GetID().ToString().Length) + " | ";
+                msg += U.GetSurname() +
+                    new string(' ', 20 - U.GetSurname().Length) + " | ";
+                msg += U.GetName() +
+                   new string(' ', 20 - U.GetName().Length) + " | ";
+                msg += U.GetFathersName() +
+                   new string(' ', 20 - U.GetFathersName().Length) + " | ";
+                msg += U.GetLogin() +
+                   new string(' ', 15 - U.GetLogin().Length) + " | ";
+                string Lab = DataBase.Query("SELECT `abbr` FROM `laboratory` WHERE `id` = " +
+                    U.GetLaboratory().ToString() + " LIMIT 1;").Rows[0].ItemArray[0].ToString();
+                msg += Lab + new string(' ', 5 - Lab.Length) + " | ";
+                msg += U.GetJob() +
+                   new string(' ', 10 - U.GetJob().Length) + " | ";
+                msg += U.GetPermissionsInt().ToString() +
+                   new string(' ', 5 - U.GetPermissionsInt().ToString().Length) + " | ";
+                msg += U.GetUserID().ToString() +
+                   new string(' ', 20 - U.GetUserID().Length) + " | ";
+
+                SendMsg(handler, msg);
+            }
+            SendMsg(handler, EndMsg);
+        }
+
+        // Добавить нового пользователя через командную строку
+        static void AddUser(Socket handler, User CurUser, string[] Params)
+        {
+            // Если не админ, то ничего не покажем!
+            if (!IsAdmin(handler, CurUser)) return;
+
+            // Начальная инициация переменных, чтобы из IF(){} вышли
+            string Name = "";
+            string FName = "";
+            string Surname = "";
+            string Login = "";
+            string Password = "";
+            string CPassword = "";
+            string Permissions = "";
+            string Laboratory = "";
+            string Job = "";
+
+            // Ищем данные
+            foreach (string Line in Params)
+            {
+                string[] Param = Line.Split(' ');
+
+                if (Param[0] == "name") Name = Param[1].Replace("\n", "").Replace("\r", "");
+                if (Param[0] == "second.name") FName = Param[1].Replace("\n", "").Replace("\r", "");
+                if (Param[0] == "surname") Surname = Param[1].Replace("\n", "").Replace("\r", "");
+                if (Param[0] == "login") Login = Param[1].Replace("\n", "").Replace("\r", "");
+                if (Param[0] == "password") Password = Param[1].Replace("\n", "").Replace("\r", "");
+                if (Param[0] == "confirm") CPassword = Param[1].Replace("\n", "").Replace("\r", "");
+                if (Param[0] == "permissions") Permissions = Param[1].Replace("\n", "").Replace("\r", "");
+                if (Param[0] == "laboratory") Laboratory = Param[1].Replace("\n", "").Replace("\r", "");
+                if (Param[0] == "job") Job = Param[1].Replace("\n", "").Replace("\r", "");
+
+                // Помощь
+                if (Param[0] == "help")
+                {
+                    SendMsg(handler, StartMsg);
+                    SendMsg(handler, @"Command to add new user. Please, enter all information about the user. Parameters must include:
+ - name [Name] - person's first name
+ - second.name [Name] - person's second name. May be empty.
+ - surname [Name] - person's surname.
+ - login [Name] - person's login/ Must be unique.
+ - password [Phrase] - person's password.
+ - confirm [Phrase] - password confirmation. Must be the same as password.
+ - permissions [Number]. 
+   - 0 - Able to add and get only his/her own molecules
+   - 1 - Able to add only his/her own molecules and to get all laboratory's molecules
+   - 2 - Able to add and get all laboratory's molecules
+   - 3 - Able to add only his/her own molecules and to get all institute's molecules
+   - 4 - Able to add all laboratory's molecules and to get all institute's molecules
+   - 5 - Able to add and get all institute's molecules
+   - 10 - Administrator's right. Able to add and get all institute's molecules. Able to rewind queries statuses. Able to work with user list. Able to direct work with database. Able to work with console.
+   - 11 - Manager. Able to add and get all institute's molecules. Able to rewind queries statuses.
+ - laboratory [Abbr.] - laboratory's abbreviation.
+ - job [Name] - person's job.");
+                    SendMsg(handler, EndMsg);
+                }
+
+            }
+
+
+        }
     }
 }

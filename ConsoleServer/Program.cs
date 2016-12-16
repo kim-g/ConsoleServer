@@ -38,7 +38,9 @@ namespace SocketServer
         // Служебные команды
         const string All_Users = "<@Show_All_Users@>";
         const string ShowHash = "<@Show_Hash@>";
+        const string Help = "help";      // Справка по консоли администратора
         // СК по базе
+        const string HelpDB = "database";    // Справка по использованию БД
         const string LastID = "database.show_last_id";    // Показать последний использованный ID
         // СК по журналу
         const string HelpLog = "log";    // Справка по использованию журнала
@@ -697,6 +699,16 @@ VALUES ('" + ((IPEndPoint)handler.RemoteEndPoint).Address.ToString() + "', '" + 
                                 Search_Molecules(handler, CurUser, "", "Permission", 1);
                                 break;
                             }
+                        case Help:
+                            {
+                                SendMsg(handler, StartMsg);
+                                SendMsg(handler, @"Administrator's console. Gives the direct access to server. Possible comands:
+ - log - direct access to server's logs;
+ - database - direct access to server's database;
+ - users - direct access to list of users.");
+                                SendMsg(handler, EndMsg);
+                                break;
+                            }
                         case LastID:
                             {
                                 SendMsg(handler, StartMsg);
@@ -715,6 +727,14 @@ VALUES ('" + ((IPEndPoint)handler.RemoteEndPoint).Address.ToString() + "', '" + 
                                 SendMsg(handler, @"System logs. Shows informations aboute program usage. Possible comands:
  - log.sessions - shows sessions history
  - log.queries - shows query history.");
+                                SendMsg(handler, EndMsg);
+                                break;
+                            }
+                        case HelpDB:
+                            {
+                                SendMsg(handler, StartMsg);
+                                SendMsg(handler, @"System database. Makes the direct access to DB commands. Possible comands:
+ - database.show_last_id - shows ID key of the last inserted row.");
                                 SendMsg(handler, EndMsg);
                                 break;
                             }
@@ -884,6 +904,7 @@ VALUES ('" + ((IPEndPoint)handler.RemoteEndPoint).Address.ToString() + "', '" + 
             string Limit = "";
             string Reason = "";
             string Active = "";
+            string IP = "";
 
             // Посмотрим все доп. параметры
             for (int i = 0; i < Params.Count(); i++)
@@ -897,8 +918,14 @@ VALUES ('" + ((IPEndPoint)handler.RemoteEndPoint).Address.ToString() + "', '" + 
                     DateRangeEnd = Param[2].Trim('\r');
                 }
                 if (Param[0] == "limit") Limit = Param[1].Trim('\r'); else Limit = "100";   // Сколько показать
-                if (Param[0] == "reason") Reason = Param[1].Trim('\r'); // Для конкретной причины выхода
+                if (Param[0] == "reason") // Для конкретной причины выхода
+                {
+                    Reason = Param[1].Trim('\r');
+                    for (int j = 2; j < Param.Count(); j++)
+                        Reason += " " + Param[j].Trim('\r');
+                }
                 if (Param[0] == "active") Active = "TRUE";              // Только активных
+                if (Param[0] == "ip") IP = Param[1].Trim('\r');     // Для конкретной даты
 
                 // Служебные
                 if (Param[0] == "help")     // Помощь
@@ -909,6 +936,7 @@ VALUES ('" + ((IPEndPoint)handler.RemoteEndPoint).Address.ToString() + "', '" + 
  - person [login] - Show only person's sessions;
  - date YYYY-MM-DD - Shows sessions that started or ended in this day;
  - perood YYYY-MM-DD YYYY-MM-DD - Shows sessions in that period of time;
+ - ip - Shows sessions from certain IP address or range. Examples: '127.0.0.1', .192.168.'
  - limit [Number] - How many sessions to show. Default is 100;
  - reason [Reason] - Shows sessions, that ended with definite reason;
  - active - Shows only current working sessions.
@@ -920,7 +948,7 @@ Parameters may be combined.");
             }
 
             // Если есть условие выборки, добавим WHERE
-            if (Person != "" || Date != "" || DateRangeBegin != "" || Reason != "" || Active != "")
+            if (Person != "" || Date != "" || DateRangeBegin != "" || Reason != "" || Active != "" || IP != "")
                 Query += " WHERE TRUE";
 
             //Выберем отдельного человека
@@ -952,7 +980,13 @@ Parameters may be combined.");
             // Выберем причину выхода из системы. Зачем может понадобиться – не знаю.
             if (Reason != "")
             {
-                Query += " AND (`reason_quit` = '" + Reason + "')";
+                Query += " AND (`reason_quit` LIKE '%" + Reason + "%')";
+            }
+
+            // Выберем IP адрес
+            if (IP != "")
+            {
+                Query += " AND (`ip` LIKE '%" + IP + "%')";
             }
 
             // Выберем активных пользователей.
@@ -968,6 +1002,7 @@ Parameters may be combined.");
 
             // И отошлём всё.
             SendMsg(handler, StartMsg);
+            SendMsg(handler, Query);
             SendMsg(handler, "| ID\t | Start date   time  \t | End   date   time  \t | User\t | IP            \t | Reason");
             SendMsg(handler, "|--------|-----------------------|-----------------------|-------|-----------------------|-----------------------------------");
 
@@ -996,7 +1031,9 @@ Parameters may be combined.");
             if (!IsAdmin(handler, CurUser)) return;
 
             // Взять всё из журнала и...
-            string Query = "SELECT * FROM `queries`";
+            string Query = @"SELECT `queries`.`id`, `persons`.`login`, `session`, `ip`, `date`, `command`, `parameters`, `comment` 
+FROM mol_base.queries
+INNER JOIN persons ON(persons.id = queries.user)";
 
             // Начальная инициация переменных, чтобы из IF(){} вышли
             string UserName = "";
@@ -1027,12 +1064,33 @@ Parameters may be combined.");
                 if (Param[0] == "parameter") Parameters = Param[1];       // Показать запросы с конкретным параметром (нафиг надо?!)
                 if (Param[0] == "comment") Comment = Param[1];            // Показать запросы с конкретым комментарием
                 if (Param[0] == "limit") Limit = Param[1];          // Показать конкретное число запросов
+
+                // Служебные
+                if (Param[0] == "help")     // Помощь
+                {
+                    SendMsg(handler, StartMsg);
+                    SendMsg(handler, @"log.queries shows list of users' queries to server. All queries are logged. There are several filter parameters:
+
+ - person [login] - Show only person's queries;
+ - date YYYY-MM-DD - Shows queries that were in this day;
+ - perood YYYY-MM-DD YYYY-MM-DD - Shows queries in that period of time;
+ - limit [Number] - How many queries to show. Default is 100;
+ - session [Number] - queries in session with ID=[Number];
+ - ip [IP address or range] - Shows queries from this IP. Examples: '127.0.0.1', '192.168.';
+ - command [Command] - Shows queries with certain main command;
+ - parameter - Shows command with definite parameter. Only one of them.
+ - comment - Shoqs queries with certain comment. Commens starts with symbols '!' - Not important, '!!' - important, '!!!' - very important. You may filter by this symbols.
+
+Parameters may be combined.");
+                    SendMsg(handler, EndMsg);
+                    return;
+                }
             }
 
             // Если есть условие выборки, добавим WHERE
             if (UserName != "" || Session != "" || IP != "" || Date != "" || DateBegin != ""
                 || Command != "" || Parameters != "")
-                Query += " WHERE TRUE";
+                Query += "\nWHERE TRUE";
 
             //Выберем отдельного человека
             if (UserName != "")
@@ -1042,22 +1100,19 @@ Parameters may be combined.");
                 Query += " AND (`user` = " + Pers + ")";
             }
 
+            //Выберем сессию
+            if (Session != "") Query += " AND (`session` = " + Session + ")";
+
             // Выберем конкретный день
             if (Date != "")
             {
-                Query += @" AND (
-    (DATE(`enter_date`) BETWEEN '" + Date + @"  00:00:00' AND '" + Date + @"  23:59:59') OR
-    (DATE(`quit_date`) BETWEEN '" + Date + @"  00:00:00' AND '" + Date + @"  23:59:59')
-)";
+                Query += @" AND (DATE(`date`) BETWEEN '" + Date + @"  00:00:00' AND '" + Date + @"  23:59:59')";
             }
 
             // Выберем диапазон дат
             if (DateBegin != "")
             {
-                Query += @" AND (
-    (DATE(`enter_date`) BETWEEN '" + DateBegin + @"  00:00:00' AND '" + DateEnd + @"  23:59:59') OR
-    (DATE(`quit_date`) BETWEEN '" + DateBegin + @"  00:00:00' AND '" + DateEnd + @"  23:59:59')
-)";
+                Query += @" AND (DATE(`date`) BETWEEN '" + DateBegin + @"  00:00:00' AND '" + DateEnd + @"  23:59:59')";
             }
 
             //Выберем IP
@@ -1070,17 +1125,17 @@ Parameters may be combined.");
             if (Parameters != "") Query += " AND (`paremeters` LIKE '%" + Parameters + "%')";
 
             //Выберем коммент
-            if (Parameters != "") Query += " AND (`comment` LIKE '%" + Comment + "%')";
+            if (Comment != "") Query += " AND (`comment` LIKE '%" + Comment + "%')";
 
             // Добавим обратную сортировку и лимит
-            Query += " ORDER BY `id` DESC LIMIT " + Limit + ";";
+            Query += "\nORDER BY `id` DESC\nLIMIT " + Limit + ";";
 
             DataTable Res = DataBase.Query(Query);
 
             // И пошлём всё пользователю.
             SendMsg(handler, StartMsg);
-            SendMsg(handler, "| ID\t | Start date   time  \t | End   date   time  \t | User\t | IP            \t | Reason");
-            SendMsg(handler, "|--------|-----------------------|-----------------------|-------|-----------------------|-----------------------------------");
+            SendMsg(handler, "| ID     | user            | session | IP              | Date                | Command (Parameters) – Comment");
+            SendMsg(handler, "|--------|-----------------|---------|-----------------|---------------------|-----------------------------------");
 
             //Server Fail – quit date of restart
             if (Res.Rows.Count == 0) SendMsg(handler, "Results not found");
@@ -1088,15 +1143,17 @@ Parameters may be combined.");
             for (int i = 0; i < Res.Rows.Count; i++)
             {
                 string msg = "| " + Res.Rows[i].ItemArray[0].ToString() + "\t | ";
-                msg += Res.Rows[i].ItemArray[1].ToString() + "\t | ";
-                msg += Res.Rows[i].ItemArray[2].ToString() != ""
-                    ? Res.Rows[i].ItemArray[2].ToString() + "\t | "
-                    : "---------- --:--:--\t | ";
-                msg += Res.Rows[i].ItemArray[3].ToString() + "\t | ";
-                msg += Res.Rows[i].ItemArray[4].ToString() + "    \t | ";
-                msg += Res.Rows[i].ItemArray[5].ToString() + "\t |";
-                msg += Res.Rows[i].ItemArray[6].ToString() + "\t |";
-                msg += Res.Rows[i].ItemArray[7].ToString() + "\t |";
+                msg += Res.Rows[i].ItemArray[1].ToString() +
+                    new String(' ', 15 - Res.Rows[i].ItemArray[1].ToString().Length) + " | ";
+                msg += Res.Rows[i].ItemArray[2].ToString() +
+                    new String(' ', 7 - Res.Rows[i].ItemArray[2].ToString().Length) + " | ";
+                msg += Res.Rows[i].ItemArray[3].ToString() +
+                    new String(' ', 15 - Res.Rows[i].ItemArray[3].ToString().Length) + " | ";
+                msg += Res.Rows[i].ItemArray[4].ToString() +
+                    new String(' ', 19 - Res.Rows[i].ItemArray[4].ToString().Length) + " | ";
+                msg += Res.Rows[i].ItemArray[5].ToString() + " (";
+                msg += Res.Rows[i].ItemArray[6].ToString().Replace('\n',' ').Replace('\r',';') + ") – ";
+                msg += Res.Rows[i].ItemArray[7].ToString() + "";
                 SendMsg(handler, msg);
             }
             SendMsg(handler, EndMsg);

@@ -230,7 +230,8 @@ namespace ConsoleServer
 
         public static int GetIDByLogin(DB DataBase, string Login)
         {
-            DataTable Name = DataBase.Query("SELECT `id` FROM `persons` WHERE `login` = '" + Login + "';");
+            DataTable Name = DataBase.Query("SELECT `id` FROM `persons` WHERE `login` = '" + 
+                Login.Trim('\r').Trim('\n').Trim() + "';");
 
             // Проверим, есть ли человек с таким ником и найдём его ID
             if (Name.Rows.Count == 0) return -1;

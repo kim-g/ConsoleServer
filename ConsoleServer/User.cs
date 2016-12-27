@@ -79,9 +79,9 @@ namespace ConsoleServer
             Rights = _Permissions;
             Job = _Job.Trim(new char[] { "\n"[0], "\r"[0], ' ' });
 
-            string queryString = "INSERT INTO `persons` (`name`, `fathers_name`, `surname`, `laboratory`, `permissions`, `login`, `password`)\n";
+            string queryString = "INSERT INTO `persons` (`name`, `fathers_name`, `surname`, `laboratory`, `permissions`, `login`, `password`, `job`)\n";
             queryString += "VALUES ('" + Name + "', '" + FName + "', '" + Surname + "', " + _Laboratory +
-                ", " + Rights + ", '" + Login + "', '" + GetPasswordHash() + "');";
+                ", " + Rights + ", '" + Login + "', '" + GetPasswordHash() + "', '" + _Job + "');";
             DataBase.ExecuteQuery(queryString);
            
             LastUsed = DateTime.Now;
@@ -185,7 +185,7 @@ namespace ConsoleServer
 
         public bool GetUserAddRermissions()
         {
-            return Rights == 10;
+            return Rights > 9;
         }
 
         public bool GetAdminRermissions()

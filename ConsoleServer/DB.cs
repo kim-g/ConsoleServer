@@ -97,5 +97,12 @@ namespace ConsoleServer
             if (con.State == ConnectionState.Open) { con.Close(); };
         }
 
+        // Выдаёт количество записей
+        public int RecordsCount(string Table, string Where)
+        {
+            DataTable DT = Query("SELECT Count(*) FROM `" + Table + "` WHERE " + Where + ";");
+            return Convert.ToInt32( DT.Rows[0].ItemArray[0] );
+        }
+
     }
 }

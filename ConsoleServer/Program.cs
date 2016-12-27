@@ -1203,11 +1203,8 @@ Parameters may be combined.");
             // Если не админ, то ничего не покажем!
             if (!CurUser.IsAdmin())
             {
-                SendMsg(handler, StartMsg);
-                SendMsg(handler, "Access denied");
-                SendMsg(handler, EndMsg);
+                ErrorMsg(handler, "Access denied");
                 return false;
-
             }
             return true;
         }
@@ -1359,14 +1356,18 @@ Parameters may be combined.");
         // Добавить нового пользователя через командную строку
         static void AddUser(Socket handler, User CurUser, string[] Params)
         {
-            // Если не админ, то ничего не покажем!
-            if (!IsAdmin(handler, CurUser)) return;
+            // Если не админ и не менеджер, то ничего не покажем!
+            if (!CurUser.GetUserAddRermissions())
+            {
+                ErrorMsg(handler, "Access denied");
+                return;
+            }
 
             // Начальная инициация переменных, чтобы из IF(){} вышли
             string Name = "";
             string FName = "";
             string Surname = "";
-            string Login = "";
+            string LoginN = "";
             string Password = "";
             string CPassword = "";
             string Permissions = "";
@@ -1381,7 +1382,7 @@ Parameters may be combined.");
                 if (Param[0] == "name") Name = Param[1].Replace("\n", "").Replace("\r", "");
                 if (Param[0] == "second.name") FName = Param[1].Replace("\n", "").Replace("\r", "");
                 if (Param[0] == "surname") Surname = Param[1].Replace("\n", "").Replace("\r", "");
-                if (Param[0] == "login") Login = Param[1].Replace("\n", "").Replace("\r", "");
+                if (Param[0] == "login") LoginN = Param[1].Replace("\n", "").Replace("\r", "");
                 if (Param[0] == "password") Password = Param[1].Replace("\n", "").Replace("\r", "");
                 if (Param[0] == "confirm") CPassword = Param[1].Replace("\n", "").Replace("\r", "");
                 if (Param[0] == "permissions") Permissions = Param[1].Replace("\n", "").Replace("\r", "");
@@ -1415,7 +1416,39 @@ Parameters may be combined.");
 
             }
 
+            // Проверяем, все ли нужные данные есть
+            if (Name == "") { ErrorMsg(handler, "Error: No name entered"); return; }
+            if (Surname == "") { ErrorMsg(handler, "Error: No surname entered"); return; }
+            if (LoginN == "") { ErrorMsg(handler, "Error: No login entered"); return; }
+            if (Password == "") { ErrorMsg(handler, "Error: No password entered"); return; }
+            if (CPassword == "") { ErrorMsg(handler, "Error: No password conformation entered"); return; }
+            if (Permissions == "") { ErrorMsg(handler, "Error: No permissions entered"); return; }
+            if (Laboratory == "") { ErrorMsg(handler, "Error: No laboratory number entered"); return; }
 
+            DataTable DT = DataBase.Query("SELECT `id` FROM `laboratory` WHERE `abbr`='" + Laboratory + "' LIMIT 1;");
+            if (DT.Rows.Count == 0) { ErrorMsg(handler, "Error: Laboratory not found"); return; };
+            string LabNum = DT.Rows[0].ItemArray[0].ToString();
+
+            // Проверка корректности введённых данных
+            if (DataBase.RecordsCount("persons", "`login`='" + LoginN + "'") > 0)
+                { ErrorMsg(handler, "Error: Login exists"); return; };
+            if (Password != CPassword)
+                { ErrorMsg(handler, "Error: \"password\" and \"confirm\" should be the similar"); return; }
+            if (DataBase.RecordsCount("laboratory", "`id`=" + LabNum + "") == 0)
+                { ErrorMsg(handler, "Error: Laboratory not found"); return; };
+
+            // Добавление пользователя в БД
+            new User(LoginN, Password, Name, FName, Surname, Convert.ToInt32(Permissions), LabNum, Job, 
+                DataBase);
+            ErrorMsg(handler, "User added");
+
+        }
+
+        private static void ErrorMsg(Socket handler, string Error)
+        {
+            SendMsg(handler, StartMsg);
+            SendMsg(handler, Error);
+            SendMsg(handler, EndMsg);
         }
     }
 }

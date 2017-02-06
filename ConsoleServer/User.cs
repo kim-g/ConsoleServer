@@ -26,11 +26,47 @@ namespace ConsoleServer
         DateTime LastUsed;
         int SessionID;
         bool Active = true;
+        DB DataBase;
 
         public const string NoUserID = "NoUserID";
 
-        public User(string UserName, string UserPassword, DB DataBase, string _IP = "NOT SET")
+        //Создание пользователя по его ID
+        public User(string UserID, DB _DataBase)
         {
+            // Запишем DB
+            DataBase = _DataBase;
+
+            // Сохраняем ID
+            ID = Convert.ToInt32(UserID.Trim(new char[] { "\n"[0], "\r"[0], ' ' }).ToLower());
+
+            // Получаем остальную инфу из БД
+            DataTable DT = DataBase.Query("SELECT * FROM `persons` WHERE `id` = \"" +
+                ID.ToString() + "\" LIMIT 1");
+
+            if (DT.Rows.Count == 0)  // Выводим результат
+            {
+                Login = NoUserID;
+                UserID = NoUserID;
+                return;
+            }
+
+            // Присваиваем параметрам значения из БД
+            Name = (DT.Rows[0].ItemArray[1] as string).Trim(new char[] { "\n"[0], "\r"[0], ' ' });
+            FName = (DT.Rows[0].ItemArray[2] as string).Trim(new char[] { "\n"[0], "\r"[0], ' ' });
+            Surname = (DT.Rows[0].ItemArray[3] as string).Trim(new char[] { "\n"[0], "\r"[0], ' ' });
+            Laboratory = Convert.ToInt32(DT.Rows[0].ItemArray[4]);
+            Rights = Convert.ToInt32(DT.Rows[0].ItemArray[5]);
+            Login = (DT.Rows[0].ItemArray[6] as string).Trim(new char[] { "\n"[0], "\r"[0], ' ' });
+            Job = DT.Rows[0].ItemArray[8] as string;
+            Active = Convert.ToInt32(DT.Rows[0].ItemArray[9]) == 1;
+
+        }
+
+        public User(string UserName, string UserPassword, DB _DataBase, string _IP = "NOT SET")
+        {
+            // Запишем DB
+            DataBase = _DataBase;
+
             Login = UserName.Trim(new char[] { "\n"[0], "\r"[0], ' ' }).ToLower();
             Password = UserPassword.Trim(new char[] { "\n"[0], "\r"[0], ' ' });
 
@@ -68,8 +104,11 @@ namespace ConsoleServer
         }
 
         public User(string UserName, string UserPassword, string _Name, string _FName, string _Surname,
-            int _Permissions, string _Laboratory, string _Job, DB DataBase)
+            int _Permissions, string _Laboratory, string _Job, DB _DataBase)
         {
+            // Запишем DB
+            DataBase = _DataBase;
+
             Name = _Name.Trim(new char[] { "\n"[0], "\r"[0] });
             FName = _FName.Trim(new char[] { "\n"[0], "\r"[0] });
             Surname = _Surname.Trim(new char[] { "\n"[0], "\r"[0] });
@@ -208,7 +247,7 @@ namespace ConsoleServer
             return Rights == 10;
         }
 
-        public void Quit(DB DataBase, string Reason)
+        public void Quit(string Reason)
         {
             DataBase.Query(@"UPDATE `sessions` 
                 SET `quit_date`=CURRENT_TIMESTAMP(), `reason_quit` = '" + Reason + @"' 
@@ -259,6 +298,11 @@ namespace ConsoleServer
         public int GetPermissionsInt()
         {
             return Rights;
+        }
+
+        void SetParam(string Param, string Value)
+        {
+            DataBase.ExecuteQuery("UPDATE `persons`");
         }
 
         const string Salt = @"ДжОнатан Билл, 

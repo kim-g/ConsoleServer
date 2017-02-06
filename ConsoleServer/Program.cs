@@ -51,6 +51,7 @@ namespace SocketServer
         const string UsersList = "users.list";  // Вывод всех пользователей
         const string ActiveUsersList = "users.active";  // Вывод залогиненных пользователей
         const string UsersAdd = "users.add";  // Добавление нового пользователя через консоль
+        const string UsersUpdate = "users.update";  // Изменение данных пользователя через консоль
 
 
         // Ответные команды
@@ -387,7 +388,7 @@ VALUES (@Name, @Laboratory, @Person, @Structure, @State, @MeltingPoint, @Conditi
             List<User> UserList = Active_Users.FindAll(x => x.GetLogin() == _User);
             foreach (User x in UserList)       // И всех их «выйдем»
             {
-                x.Quit(DataBase, "User Relogin");
+                x.Quit("User Relogin");
             }
 
             // ...удалив из списка
@@ -507,7 +508,7 @@ VALUES (" + FileID + ", " + MoleculeID + ")");
         // Выход пользователя
         static void User_Quit(Socket handler, User CurUser)
         {
-            CurUser.Quit(DataBase, "User Quited");
+            CurUser.Quit("User Quited");
             Active_Users.Remove(CurUser);
             SendMsg(handler, StartMsg);
             SendMsg(handler, "OK");
@@ -778,6 +779,11 @@ VALUES ('" + ((IPEndPoint)handler.RemoteEndPoint).Address.ToString() + "', '" + 
                                 AddUser(handler, CurUser, GetParameters(data_parse));
                                 break;
                             }
+                        case UsersUpdate:
+                            {
+                                UpdateUser(handler, CurUser, GetParameters(data_parse));
+                                break;
+                            }
                         default:
                             {
                                 DataBase.ExecuteQuery("UPDATE `queries` SET `comment` = '! Unknown command' " +
@@ -828,7 +834,7 @@ VALUES ('" + ((IPEndPoint)handler.RemoteEndPoint).Address.ToString() + "', '" + 
 
             if ((DateTime.Now - CurUser.GetLastUse()).TotalSeconds > UserTimeOut)
             {
-                CurUser.Quit(DataBase, "Time out");
+                CurUser.Quit("Time out");
                 Active_Users.Remove(CurUser);
                 return null;
             }
@@ -837,7 +843,7 @@ VALUES ('" + ((IPEndPoint)handler.RemoteEndPoint).Address.ToString() + "', '" + 
             List<User> LU = Active_Users.FindAll(x => (DateTime.Now - x.GetLastUse()).TotalSeconds > UserTimeOut);
             foreach (User U in LU)
             {
-                U.Quit(DataBase, "Time out");
+                U.Quit("Time out");
                 Active_Users.Remove(U);
             }
 
@@ -1442,7 +1448,142 @@ Parameters may be combined.");
                 DataBase);
             ErrorMsg(handler, "User added");
 
+            /*          
+                        /\
+                       /o \
+                      /o  o\
+                      --/\--
+                       /O \
+                      /    \
+                     /o   O \
+                    /o   o   \
+                    ---/  \---
+                      /O  o\
+                     /      \
+                    /o  O   O\
+                   /     o    \
+                  /  O      O  \
+                  -----|  |-----
+                       |  |
+                       |  |
+                       ----
+
+            */
+
         }
+
+        // Изменить данные пользователя через командную строку
+        static void UpdateUser(Socket handler, User CurUser, string[] Params)
+        {
+            // Если не админ и не менеджер, то ничего не покажем!
+            if (!CurUser.GetUserAddRermissions())
+            {
+                ErrorMsg(handler, "Access denied");
+                return;
+            }
+
+            // Начальная инициация переменных, чтобы из IF(){} вышли
+            string Name = "";
+            string FName = "";
+            string Surname = "";
+            string LoginN = "";
+            string Password = "";
+            string CPassword = "";
+            string Permissions = "";
+            string Laboratory = "";
+            string Job = "";
+
+            // Ищем данные
+            foreach (string Line in Params)
+            {
+                string[] Param = Line.Split(' ');
+
+                if (Param[0] == "name") Name = Param[1].Replace("\n", "").Replace("\r", "");
+                if (Param[0] == "second.name") FName = Param[1].Replace("\n", "").Replace("\r", "");
+                if (Param[0] == "surname") Surname = Param[1].Replace("\n", "").Replace("\r", "");
+                if (Param[0] == "login") LoginN = Param[1].Replace("\n", "").Replace("\r", "");
+                if (Param[0] == "password") Password = Param[1].Replace("\n", "").Replace("\r", "");
+                if (Param[0] == "confirm") CPassword = Param[1].Replace("\n", "").Replace("\r", "");
+                if (Param[0] == "permissions") Permissions = Param[1].Replace("\n", "").Replace("\r", "");
+                if (Param[0] == "laboratory") Laboratory = Param[1].Replace("\n", "").Replace("\r", "");
+                if (Param[0] == "job") Job = Param[1].Replace("\n", "").Replace("\r", "");
+
+                // Помощь
+                if (Param[0] == "help")
+                {
+                    SendMsg(handler, StartMsg);
+                    SendMsg(handler, @"Command to update user's information. Parameters may include:
+ - name [Name] - person's first name
+ - second.name [Name] - person's second name. May be empty.
+ - surname [Name] - person's surname.
+ - login [Name] - person's login/ Must be unique.
+ - password [Phrase] - person's password.
+ - confirm [Phrase] - password confirmation. Must be the same as password.
+ - permissions [Number]. 
+   - 0 - Able to add and get only his/her own molecules
+   - 1 - Able to add only his/her own molecules and to get all laboratory's molecules
+   - 2 - Able to add and get all laboratory's molecules
+   - 3 - Able to add only his/her own molecules and to get all institute's molecules
+   - 4 - Able to add all laboratory's molecules and to get all institute's molecules
+   - 5 - Able to add and get all institute's molecules
+   - 10 - Administrator's right. Able to add and get all institute's molecules. Able to rewind queries statuses. Able to work with user list. Able to direct work with database. Able to work with console.
+   - 11 - Manager. Able to add and get all institute's molecules. Able to rewind queries statuses.
+ - laboratory [Abbr.] - laboratory's abbreviation.
+ - job [Name] - person's job.");
+                    SendMsg(handler, EndMsg);
+                }
+
+            }
+
+            // Проверяем, все ли нужные данные есть
+            string LabNum = "";
+            if (Laboratory != "")
+            {
+                DataTable DT = DataBase.Query("SELECT `id` FROM `laboratory` WHERE `abbr`='" + Laboratory + "' LIMIT 1;");
+                if (DT.Rows.Count == 0) { ErrorMsg(handler, "Error: Laboratory not found"); return; };
+                LabNum = DT.Rows[0].ItemArray[0].ToString();
+            }
+
+            // Проверка корректности введённых данных
+            if (LoginN != "")
+                if (DataBase.RecordsCount("persons", "`login`='" + LoginN + "'") > 0)
+                { ErrorMsg(handler, "Error: Login exists"); return; };
+            if (Password != "")
+                if (Password != CPassword)
+                { ErrorMsg(handler, "Error: \"password\" and \"confirm\" should be the similar"); return; }
+            if (LabNum != "")
+                if (DataBase.RecordsCount("laboratory", "`id`=" + LabNum + "") == 0)
+                { ErrorMsg(handler, "Error: Laboratory not found"); return; };
+
+            // Добавление пользователя в БД
+            new User(LoginN, Password, Name, FName, Surname, Convert.ToInt32(Permissions), LabNum, Job,
+                DataBase);
+            ErrorMsg(handler, "User added");
+
+            /*          
+                        /\
+                       /o \
+                      /o  o\
+                      --/\--
+                       /O \
+                      /    \
+                     /o   O \
+                    /o   o   \
+                    ---/  \---
+                      /O  o\
+                     /      \
+                    /o  O   O\
+                   /     o    \
+                  /  O      O  \
+                  -----|  |-----
+                       |  |
+                       |  |
+                       ----
+
+            */
+
+        }
+
 
         private static void ErrorMsg(Socket handler, string Error)
         {

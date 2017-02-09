@@ -1209,7 +1209,7 @@ Parameters may be combined.");
             // Если не админ, то ничего не покажем!
             if (!CurUser.IsAdmin())
             {
-                ErrorMsg(handler, "Access denied");
+                SimpleMsg(handler, "Access denied");
                 return false;
             }
             return true;
@@ -1365,7 +1365,7 @@ Parameters may be combined.");
             // Если не админ и не менеджер, то ничего не покажем!
             if (!CurUser.GetUserAddRermissions())
             {
-                ErrorMsg(handler, "Access denied");
+                SimpleMsg(handler, "Access denied");
                 return;
             }
 
@@ -1423,30 +1423,30 @@ Parameters may be combined.");
             }
 
             // Проверяем, все ли нужные данные есть
-            if (Name == "") { ErrorMsg(handler, "Error: No name entered"); return; }
-            if (Surname == "") { ErrorMsg(handler, "Error: No surname entered"); return; }
-            if (LoginN == "") { ErrorMsg(handler, "Error: No login entered"); return; }
-            if (Password == "") { ErrorMsg(handler, "Error: No password entered"); return; }
-            if (CPassword == "") { ErrorMsg(handler, "Error: No password conformation entered"); return; }
-            if (Permissions == "") { ErrorMsg(handler, "Error: No permissions entered"); return; }
-            if (Laboratory == "") { ErrorMsg(handler, "Error: No laboratory number entered"); return; }
+            if (Name == "") { SimpleMsg(handler, "Error: No name entered"); return; }
+            if (Surname == "") { SimpleMsg(handler, "Error: No surname entered"); return; }
+            if (LoginN == "") { SimpleMsg(handler, "Error: No login entered"); return; }
+            if (Password == "") { SimpleMsg(handler, "Error: No password entered"); return; }
+            if (CPassword == "") { SimpleMsg(handler, "Error: No password conformation entered"); return; }
+            if (Permissions == "") { SimpleMsg(handler, "Error: No permissions entered"); return; }
+            if (Laboratory == "") { SimpleMsg(handler, "Error: No laboratory number entered"); return; }
 
             DataTable DT = DataBase.Query("SELECT `id` FROM `laboratory` WHERE `abbr`='" + Laboratory + "' LIMIT 1;");
-            if (DT.Rows.Count == 0) { ErrorMsg(handler, "Error: Laboratory not found"); return; };
+            if (DT.Rows.Count == 0) { SimpleMsg(handler, "Error: Laboratory not found"); return; };
             string LabNum = DT.Rows[0].ItemArray[0].ToString();
 
             // Проверка корректности введённых данных
             if (DataBase.RecordsCount("persons", "`login`='" + LoginN + "'") > 0)
-                { ErrorMsg(handler, "Error: Login exists"); return; };
+                { SimpleMsg(handler, "Error: Login exists"); return; };
             if (Password != CPassword)
-                { ErrorMsg(handler, "Error: \"password\" and \"confirm\" should be the similar"); return; }
+                { SimpleMsg(handler, "Error: \"password\" and \"confirm\" should be the similar"); return; }
             if (DataBase.RecordsCount("laboratory", "`id`=" + LabNum + "") == 0)
-                { ErrorMsg(handler, "Error: Laboratory not found"); return; };
+                { SimpleMsg(handler, "Error: Laboratory not found"); return; };
 
             // Добавление пользователя в БД
             new User(LoginN, Password, Name, FName, Surname, Convert.ToInt32(Permissions), LabNum, Job, 
                 DataBase);
-            ErrorMsg(handler, "User added");
+            SimpleMsg(handler, "User added");
 
             /*          
                         /\
@@ -1478,7 +1478,7 @@ Parameters may be combined.");
             // Если не админ и не менеджер, то ничего не покажем!
             if (!CurUser.GetUserAddRermissions())
             {
-                ErrorMsg(handler, "Access denied");
+                SimpleMsg(handler, "Access denied");
                 return;
             }
 
@@ -1540,25 +1540,25 @@ Parameters may be combined.");
             if (Laboratory != "")
             {
                 DataTable DT = DataBase.Query("SELECT `id` FROM `laboratory` WHERE `abbr`='" + Laboratory + "' LIMIT 1;");
-                if (DT.Rows.Count == 0) { ErrorMsg(handler, "Error: Laboratory not found"); return; };
+                if (DT.Rows.Count == 0) { SimpleMsg(handler, "Error: Laboratory not found"); return; };
                 LabNum = DT.Rows[0].ItemArray[0].ToString();
             }
 
             // Проверка корректности введённых данных
             if (LoginN != "")
                 if (DataBase.RecordsCount("persons", "`login`='" + LoginN + "'") > 0)
-                { ErrorMsg(handler, "Error: Login exists"); return; };
+                { SimpleMsg(handler, "Error: Login exists"); return; };
             if (Password != "")
                 if (Password != CPassword)
-                { ErrorMsg(handler, "Error: \"password\" and \"confirm\" should be the similar"); return; }
+                { SimpleMsg(handler, "Error: \"password\" and \"confirm\" should be the similar"); return; }
             if (LabNum != "")
                 if (DataBase.RecordsCount("laboratory", "`id`=" + LabNum + "") == 0)
-                { ErrorMsg(handler, "Error: Laboratory not found"); return; };
+                { SimpleMsg(handler, "Error: Laboratory not found"); return; };
 
             // Добавление пользователя в БД
             new User(LoginN, Password, Name, FName, Surname, Convert.ToInt32(Permissions), LabNum, Job,
                 DataBase);
-            ErrorMsg(handler, "User added");
+            SimpleMsg(handler, "User added");
 
             /*          
                         /\
@@ -1585,7 +1585,7 @@ Parameters may be combined.");
         }
 
 
-        private static void ErrorMsg(Socket handler, string Error)
+        private static void SimpleMsg(Socket handler, string Error)
         {
             SendMsg(handler, StartMsg);
             SendMsg(handler, Error);

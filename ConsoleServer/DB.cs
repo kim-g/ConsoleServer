@@ -53,20 +53,23 @@ namespace ConsoleServer
         }
 
         // Запрос в БД без выдачи результата.
-        public void ExecuteQuery(string QueryString)
+        public int ExecuteQuery(string QueryString)
         {
             MySqlCommand com = new MySqlCommand(QueryString, con);
+            int result= -1;
 
             try
             {
                 ConOpen();
-                com.ExecuteNonQuery();
+                result = com.ExecuteNonQuery();
                 con.Close();
             }
             catch (Exception ex)
             {
                 Console.WriteLine(ex.Message);
             }
+
+            return result;
         }
 
         // Конструктор. Требует параметров БД для соединения. Создаёт MySqlConnection объект внутри себя.
@@ -102,6 +105,20 @@ namespace ConsoleServer
         {
             DataTable DT = Query("SELECT Count(*) FROM `" + Table + "` WHERE " + Where + ";");
             return Convert.ToInt32( DT.Rows[0].ItemArray[0] );
+        }
+
+        // Выдаёт первую запись в виде List<string>
+        public List<string> QueryOne(string QueryString)
+        {
+            DataTable Table = Query(QueryString);
+            if (Table.Rows.Count == 0) return null;
+
+            List<string> Res = new List<string>(); 
+            foreach (var El in Table.Rows[0].ItemArray)
+            {
+                Res.Add(El.ToString());
+            }
+            return Res;
         }
 
     }

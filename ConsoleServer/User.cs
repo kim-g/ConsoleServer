@@ -300,12 +300,84 @@ namespace ConsoleServer
             return Rights;
         }
 
-        void SetParam(string Param, string Value)
+        bool SetParam(string Param, string Value)
         {
-            DataBase.ExecuteQuery("UPDATE `persons`");
+            return DataBase.ExecuteQuery("UPDATE `persons` SET `" + Param + "`=" + Value) == 0;
         }
 
-        const string Salt = @"ДжОнатан Билл, 
+        public bool SetName(string NewName)
+        {
+            bool OK = SetParam("name", "'" + NewName + "'");
+            if (OK) Name = NewName;
+            return OK;
+        }
+
+        public bool SetSecondName(string NewSecondName)
+        {
+            bool OK = SetParam("fathers_name", "'" + NewSecondName + "'");
+            if (OK) FName = NewSecondName;
+            return OK;
+        }
+
+        public bool SetSurame(string NewSurName)
+        {
+            bool OK = SetParam("Surname", "'" + NewSurName + "'");
+            if (OK) Surname = NewSurName;
+            return OK;
+        }
+
+        public bool SetRights(int NewRights)
+        {
+            bool OK = SetParam("Permissions", NewRights.ToString());
+            if (OK) Rights = NewRights;
+            return OK;
+        }
+
+        public bool SetLogin(string NewLogin)
+        {
+            bool OK = SetParam("login", "'" + NewLogin + "'");
+            if (OK) Login = NewLogin;
+            return OK;
+        }
+
+        public bool SetPassword(string OldPassword, string NewPassword)
+        {
+            string OldPassHash = DataBase.QueryOne("SELECT `Password` FROM `persons` WHERE `id`="+ID.ToString())[0];
+            string Entered_old_PassHash = getMd5Hash(OldPassword + Salt);
+
+            if (OldPassHash != Entered_old_PassHash) return false;
+
+            bool OK = SetParam("Surname", "'" + getMd5Hash(NewPassword + Salt) + "'");
+            if (OK) Password = NewPassword;
+            return OK;
+        }
+
+        public bool SetLaboratory(int NewLaboratory)
+        {
+            // проверим, есть ли такая лаборатория
+            if (DataBase.RecordsCount("laboratory", "`id` = " + NewLaboratory) == 0) return false;
+
+            bool OK = SetParam("laboratory", NewLaboratory.ToString());
+            if (OK) Laboratory = NewLaboratory;
+            return OK;
+        }
+
+        public bool SetJob(string NewJob)
+        {
+            bool OK = SetParam("job", "'" + NewJob + "'");
+            if (OK) Job = NewJob;
+            return OK;
+        }
+
+        public bool SetActive(bool NewActive)
+        {
+            string value = NewActive ? "1" : "0";
+            bool OK = SetParam("active", value);
+            if (OK) Active = NewActive;
+            return OK;
+        }
+
+        const string Salt =   @"ДжОнатан Билл, 
                                 который убил 
                                 медведя 
                                 в Чёрном Бору, 

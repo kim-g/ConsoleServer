@@ -836,14 +836,17 @@ VALUES ('" + ((IPEndPoint)handler.RemoteEndPoint).Address.ToString() + "', '" + 
                 SimpleMsg(handler, "Access denied");
                 return;
             }
+            
+            // Объявляем параметры
+            string ULogin = "";
 
             // Ищем данные
             foreach (string Line in Params)
             {
                 string[] Param = Line.Split(' ');
 
-                // Объявляем параметры
-                string ULogin = "";
+
+                
 
                 if (Param[0] == "login") ULogin = Param[1].Replace("\n", "").Replace("\r", "");
                 // Помощь
@@ -853,18 +856,21 @@ VALUES ('" + ((IPEndPoint)handler.RemoteEndPoint).Address.ToString() + "', '" + 
                     return;
                 }
 
-                // Проверяем, все ли нужные данные есть
-                if (ULogin == "") { Users_Remove_Help(handler); return; }
-                List<string> id_list = DataBase.QueryOne("SELECT `id` FROM `persons` WHERE `login` = '" + ULogin + "' LIMIT 1;");
-                if (id_list == null) { SimpleMsg(handler, "Error: No such login of user to change information."); return; }
-
-                // Ищем пользователя.
-                User UserToChange = new User(id_list[0], DataBase);
-                UserToChange.DeleteUser();
-
-                // И отошлём информацию, что всё OK
-                SimpleMsg(handler, "User was deleted successfully");
             }
+
+
+            // Проверяем, все ли нужные данные есть 
+            if (ULogin == "") { Users_Remove_Help(handler); return; }
+            List<string> id_list = DataBase.QueryOne("SELECT `id` FROM `persons` WHERE `login` = '" + ULogin + "' LIMIT 1;");
+            if (id_list == null) { SimpleMsg(handler, "Error: No such login of user to change information."); return; }
+
+            // Ищем пользователя.
+            User UserToChange = new User(id_list[0], DataBase);
+            UserToChange.DeleteUser();
+
+            // И отошлём информацию, что всё OK
+            SimpleMsg(handler, "User was deleted successfully");
+        }
 
         private static void RemoveUser(Socket handler, User CurUser, string[] Params)
         {

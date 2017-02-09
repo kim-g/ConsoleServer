@@ -52,7 +52,8 @@ namespace SocketServer
         const string ActiveUsersList = "users.active";  // Вывод залогиненных пользователей
         const string UsersAdd = "users.add";  // Добавление нового пользователя через консоль
         const string UsersUpdate = "users.update";  // Изменение данных пользователя через консоль
-
+        const string UsersRemove = "users.remove";  // Скрытие пользователя и запрет ему на работу (запись не удаляется)
+        const string UsersRMRF = "users.rmrf";  // Удаление пользователя из БД.
 
         // Ответные команды
         const string LoginOK = "<@Login_OK@>";
@@ -758,8 +759,7 @@ VALUES ('" + ((IPEndPoint)handler.RemoteEndPoint).Address.ToString() + "', '" + 
  - users.active - shows currently logged in users;
  - users.add - Adds new user
  - users.update - changes user information
- - users.password - changes user's password
- - users.remove - delete user. May be reversible;
+ - users.remove - delete user. May be reversible. Safe for work;
  - users.rmrf - delete the user's record. Irreversable.");
                                 SendMsg(handler, EndMsg);
                                 break;
@@ -782,6 +782,16 @@ VALUES ('" + ((IPEndPoint)handler.RemoteEndPoint).Address.ToString() + "', '" + 
                         case UsersUpdate:
                             {
                                 UpdateUser(handler, CurUser, GetParameters(data_parse));
+                                break;
+                            }
+                        case UsersRemove:
+                            {
+                                RemoveUser(handler, CurUser, GetParameters(data_parse));
+                                break;
+                            }
+                        case UsersRMRF:
+                            {
+                                RMRFUser(handler, CurUser, GetParameters(data_parse));
                                 break;
                             }
                         default:
@@ -816,6 +826,91 @@ VALUES ('" + ((IPEndPoint)handler.RemoteEndPoint).Address.ToString() + "', '" + 
             {
                 Console.ReadLine();
             }
+        }
+
+        private static void RMRFUser(Socket handler, User CurUser, string[] Params)
+        {
+            // Если не админ, то ничего не покажем!
+            if (!CurUser.IsAdmin())
+            {
+                SimpleMsg(handler, "Access denied");
+                return;
+            }
+
+            // Ищем данные
+            foreach (string Line in Params)
+            {
+                string[] Param = Line.Split(' ');
+
+                // Объявляем параметры
+                string ULogin = "";
+
+                if (Param[0] == "login") ULogin = Param[1].Replace("\n", "").Replace("\r", "");
+                // Помощь
+                if (Param[0] == "help")
+                {
+                    Users_Remove_Help(handler);
+                    return;
+                }
+
+                // Проверяем, все ли нужные данные есть
+                if (ULogin == "") { Users_Remove_Help(handler); return; }
+                List<string> id_list = DataBase.QueryOne("SELECT `id` FROM `persons` WHERE `login` = '" + ULogin + "' LIMIT 1;");
+                if (id_list == null) { SimpleMsg(handler, "Error: No such login of user to change information."); return; }
+
+                // Ищем пользователя.
+                User UserToChange = new User(id_list[0], DataBase);
+                UserToChange.DeleteUser();
+
+                // И отошлём информацию, что всё OK
+                SimpleMsg(handler, "User was deleted successfully");
+            }
+
+        private static void RemoveUser(Socket handler, User CurUser, string[] Params)
+        {
+            // Если не админ и не менеджер, то ничего не покажем!
+            if (!CurUser.GetUserAddRermissions())
+            {
+                SimpleMsg(handler, "Access denied");
+                return;
+            }
+
+            // Ищем данные
+            foreach (string Line in Params)
+            {
+                string[] Param = Line.Split(' ');
+
+                // Объявляем параметры
+                string ULogin = "";
+
+                if (Param[0] == "login") ULogin = Param[1].Replace("\n", "").Replace("\r", "");
+                // Помощь
+                if (Param[0] == "help")
+                {
+                    Users_Remove_Help(handler);
+                    return;
+                }
+
+                // Проверяем, все ли нужные данные есть
+                if (ULogin == "") { Users_Remove_Help(handler); return; }
+                List<string> id_list = DataBase.QueryOne("SELECT `id` FROM `persons` WHERE `login` = '" + ULogin + "' LIMIT 1;");
+                if (id_list == null) { SimpleMsg(handler, "Error: No such login of user to change information."); return; }
+
+                // Ищем пользователя.
+                User UserToChange = new User(id_list[0], DataBase);
+                UserToChange.SetActive(false);
+
+                // И отошлём информацию, что всё OK
+                SimpleMsg(handler, "User was removed successfully");
+            }
+        }
+
+        private static void Users_Remove_Help(Socket handler)
+        {
+            SendMsg(handler, StartMsg);
+            SendMsg(handler, @"Command to remove user from the system. Reversible. Safe. Parameters may include:
+ - login [login] - login of user to remove.");
+            SendMsg(handler, EndMsg);
         }
 
         private static string[] GetParameters(string[] data_parse)
@@ -1483,12 +1578,14 @@ Parameters may be combined.");
             }
 
             // Начальная инициация переменных, чтобы из IF(){} вышли
+            string ULogin = "";
             string Name = "";
             string FName = "";
             string Surname = "";
             string LoginN = "";
             string Password = "";
             string CPassword = "";
+            string OldPassword = "";
             string Permissions = "";
             string Laboratory = "";
             string Job = "";
@@ -1498,10 +1595,12 @@ Parameters may be combined.");
             {
                 string[] Param = Line.Split(' ');
 
+                if (Param[0] == "login") ULogin = Param[1].Replace("\n", "").Replace("\r", "");
                 if (Param[0] == "name") Name = Param[1].Replace("\n", "").Replace("\r", "");
                 if (Param[0] == "second.name") FName = Param[1].Replace("\n", "").Replace("\r", "");
                 if (Param[0] == "surname") Surname = Param[1].Replace("\n", "").Replace("\r", "");
-                if (Param[0] == "login") LoginN = Param[1].Replace("\n", "").Replace("\r", "");
+                if (Param[0] == "newlogin") LoginN = Param[1].Replace("\n", "").Replace("\r", "");
+                if (Param[0] == "oldpassword") OldPassword = Param[1].Replace("\n", "").Replace("\r", "");
                 if (Param[0] == "password") Password = Param[1].Replace("\n", "").Replace("\r", "");
                 if (Param[0] == "confirm") CPassword = Param[1].Replace("\n", "").Replace("\r", "");
                 if (Param[0] == "permissions") Permissions = Param[1].Replace("\n", "").Replace("\r", "");
@@ -1513,10 +1612,12 @@ Parameters may be combined.");
                 {
                     SendMsg(handler, StartMsg);
                     SendMsg(handler, @"Command to update user's information. Parameters may include:
+ - login [login] - login of user to change
  - name [Name] - person's first name
  - second.name [Name] - person's second name. May be empty.
  - surname [Name] - person's surname.
- - login [Name] - person's login/ Must be unique.
+ - newlogin [login] - person's new login/ Must be unique.
+ - oldpassword [Phrase] - person's existing password. Nessessary to change password.
  - password [Phrase] - person's password.
  - confirm [Phrase] - password confirmation. Must be the same as password.
  - permissions [Number]. 
@@ -1531,17 +1632,19 @@ Parameters may be combined.");
  - laboratory [Abbr.] - laboratory's abbreviation.
  - job [Name] - person's job.");
                     SendMsg(handler, EndMsg);
+                    return;
                 }
 
             }
 
             // Проверяем, все ли нужные данные есть
-            string LabNum = "";
+            if (ULogin == "") { SimpleMsg(handler, "Error: No login of user to change information. Use \"login\" parameter."); return; }
+            int LabNum = -1;
             if (Laboratory != "")
             {
                 DataTable DT = DataBase.Query("SELECT `id` FROM `laboratory` WHERE `abbr`='" + Laboratory + "' LIMIT 1;");
                 if (DT.Rows.Count == 0) { SimpleMsg(handler, "Error: Laboratory not found"); return; };
-                LabNum = DT.Rows[0].ItemArray[0].ToString();
+                LabNum = (int)DT.Rows[0].ItemArray[0];
             }
 
             // Проверка корректности введённых данных
@@ -1551,14 +1654,44 @@ Parameters may be combined.");
             if (Password != "")
                 if (Password != CPassword)
                 { SimpleMsg(handler, "Error: \"password\" and \"confirm\" should be the similar"); return; }
-            if (LabNum != "")
-                if (DataBase.RecordsCount("laboratory", "`id`=" + LabNum + "") == 0)
+            if (LabNum != -1)
+                if (DataBase.RecordsCount("laboratory", "`id`=" + LabNum.ToString() + "") == 0)
                 { SimpleMsg(handler, "Error: Laboratory not found"); return; };
+            List<string> id_list = DataBase.QueryOne("SELECT `id` FROM `persons` WHERE `login` = '" + ULogin + "' LIMIT 1;");
+            if (id_list == null) { SimpleMsg(handler, "Error: No such login of user to change information."); return; }
 
-            // Добавление пользователя в БД
-            new User(LoginN, Password, Name, FName, Surname, Convert.ToInt32(Permissions), LabNum, Job,
-                DataBase);
-            SimpleMsg(handler, "User added");
+            // Открытие записи пользователя в БД
+            User UserToChange = new User(id_list[0], DataBase);
+
+            //Испраляем всё то, что нам послали.
+            if (Name != "")
+                if (!UserToChange.SetName(Name))
+                { SimpleMsg(handler, "Error: Unable to change name."); return; };
+            if (FName != "")
+                if (!UserToChange.SetSecondName(FName))
+                { SimpleMsg(handler, "Error: Unable to change second name."); return; };
+            if (Surname != "")
+                if (!UserToChange.SetSurname(Surname))
+                { SimpleMsg(handler, "Error: Unable to change surname."); return; };
+            if (LoginN != "")
+                if (!UserToChange.SetLogin(LoginN))
+                { SimpleMsg(handler, "Error: Unable to change login. New login should be uniqe."); return; };
+            if (Password != "")
+                if (!UserToChange.SetPassword(OldPassword, Password))
+                { SimpleMsg(handler, "Error: Unable to change password. Old password may be not valid or some error happend."); return; };
+            if(Permissions != "")
+                if (!UserToChange.SetRights(Convert.ToInt32(Permissions)))
+                { SimpleMsg(handler, "Error: Unable to change permissions."); return; };
+            if (Laboratory != "")
+                if (!UserToChange.SetLaboratory(LabNum))
+                { SimpleMsg(handler, "Error: Unable to change laboratory."); return; };
+            if (Job != "")
+                if (!UserToChange.SetJob(Job))
+                { SimpleMsg(handler, "Error: Unable to change job."); return; };
+
+
+            // Отсылаем команду, что всё хорошо.
+            SimpleMsg(handler, "User information updated");
 
             /*          
                         /\
@@ -1575,10 +1708,10 @@ Parameters may be combined.");
                     /o  O   O\
                    /     o    \
                   /  O      O  \
-                  -----|  |-----
-                       |  |
-                       |  |
-                       ----
+                  -----|  |-----     _
+                       |  |       __/ \
+    ____               |  |      /     \_____
+ --/    \-----------------------/            \-----------------------------
 
             */
 

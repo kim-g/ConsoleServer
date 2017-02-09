@@ -302,7 +302,8 @@ namespace ConsoleServer
 
         bool SetParam(string Param, string Value)
         {
-            return DataBase.ExecuteQuery("UPDATE `persons` SET `" + Param + "`=" + Value) == 0;
+            return DataBase.ExecuteQuery("UPDATE `persons` SET `" + Param + "`=" + Value + 
+                " WHERE `id` = " + ID + " LIMIT 1") == 1;
         }
 
         public bool SetName(string NewName)
@@ -319,7 +320,7 @@ namespace ConsoleServer
             return OK;
         }
 
-        public bool SetSurame(string NewSurName)
+        public bool SetSurname(string NewSurName)
         {
             bool OK = SetParam("Surname", "'" + NewSurName + "'");
             if (OK) Surname = NewSurName;
@@ -335,6 +336,8 @@ namespace ConsoleServer
 
         public bool SetLogin(string NewLogin)
         {
+            if (DataBase.RecordsCount("persons", "`login` = '" + NewLogin + "'") > 0) return false;
+
             bool OK = SetParam("login", "'" + NewLogin + "'");
             if (OK) Login = NewLogin;
             return OK;
@@ -347,7 +350,7 @@ namespace ConsoleServer
 
             if (OldPassHash != Entered_old_PassHash) return false;
 
-            bool OK = SetParam("Surname", "'" + getMd5Hash(NewPassword + Salt) + "'");
+            bool OK = SetParam("password", "'" + getMd5Hash(NewPassword + Salt) + "'");
             if (OK) Password = NewPassword;
             return OK;
         }
@@ -375,6 +378,12 @@ namespace ConsoleServer
             bool OK = SetParam("active", value);
             if (OK) Active = NewActive;
             return OK;
+        }
+
+        public bool DeleteUser()
+        {
+            return DataBase.ExecuteQuery("DELETE FROM `persons` WHERE `id`=" + ID.ToString() + 
+                " LIMIT 1") > 0;
         }
 
         const string Salt =   @"ДжОнатан Билл, 

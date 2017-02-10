@@ -256,6 +256,7 @@ namespace SocketServer
             SendMsg(handler, Commands.Answer.EndMsg);
         }
 
+        // УСТАРЕЛО!!!
         static void Add_User_to_DB(Socket handler, User CurUser, string UserName, string Password)
         {
             if (CurUser.GetUserAddRermissions())
@@ -314,6 +315,7 @@ WHERE `id` = " + dt.Rows[i].ItemArray[0].ToString();
             return "NULL";
         }
 
+        // УСТАРЕЛО!!!
         static void AddMolecule(Socket handler, User CurUser, string[] Data)
         {
             string queryString = @"INSERT INTO `molecules` 
@@ -752,6 +754,11 @@ VALUES ('" + ((IPEndPoint)handler.RemoteEndPoint).Address.ToString() + "', '" + 
                                 RMRFUser(handler, CurUser, GetParameters(data_parse));
                                 break;
                             }
+                        case Commands.Molecules.Add:
+                            {
+                                Molecule_Add(handler, CurUser, GetParameters(data_parse));
+                                break;
+                            }
                         default:
                             {
                                 DataBase.ExecuteQuery("UPDATE `queries` SET `comment` = '! Unknown command' " +
@@ -784,6 +791,85 @@ VALUES ('" + ((IPEndPoint)handler.RemoteEndPoint).Address.ToString() + "', '" + 
             {
                 Console.ReadLine();
             }
+        }
+
+        private static void Molecule_Add(Socket handler, User CurUser, string[] Params)
+        {
+            // Начальная инициация переменных, чтобы из IF(){} вышли
+            string Subst = "";
+            string Lab = "";
+            string Person = "";
+            string Structure = "";
+            string PhysState = "";
+            string Melt = "";
+            string Conditions = "";
+            string Properties = "";
+            string Mass = "";
+            string Solution = "";
+
+            // Ищем данные
+            foreach (string Line in Params)
+            {
+                string[] Param = Line.Split(' ');
+
+                if (Param[0] == "code") Subst = Param[1].Replace("\n", "").Replace("\r", "");
+                if (Param[0] == "laboratory") Lab = Param[1].Replace("\n", "").Replace("\r", "");
+                if (Param[0] == "person") Person = Param[1].Replace("\n", "").Replace("\r", "");
+                if (Param[0] == "structure") Structure = Param[1].Replace("\n", "").Replace("\r", "");
+                if (Param[0] == "phys_state") PhysState = Param[1].Replace("\n", "").Replace("\r", "");
+                if (Param[0] == "melting_point") Melt = Param[1].Replace("\n", "").Replace("\r", "");
+                if (Param[0] == "conditions") Conditions = Param[1].Replace("\n", "").Replace("\r", "");
+                if (Param[0] == "properties") Properties = Param[1].Replace("\n", "").Replace("\r", "");
+                if (Param[0] == "mass") Mass = Param[1].Replace("\n", "").Replace("\r", "");
+                if (Param[0] == "solution") Solution = Param[1].Replace("\n", "").Replace("\r", "");
+
+                // Помощь
+                if (Param[0] == "help")
+                {
+                    SimpleMsg(handler, @"Command to add new molecule. Please, enter all information about the this. Parameters must include:
+ - code [Name] - Code of the substance.
+ - laboratory [Code] - ID of owner's laboratory.
+ - person [Code] - ID of owner.
+ - structure [SMILES] - molecular structure in SMILES format.
+ - phys_state [Phrase] - physical state (liquid, gas, solid...).
+ - melting_point [Temperature] - Temperature of melting point.
+ - conditions [Phrase] - storage conditions. 
+ - properties [Phrase] - other properties.
+ - mass [grammes] - mass of surrendered sample.
+ - solution [Phrase] - best solutions.");
+                }
+            }
+
+            // Проверяем, все ли нужные данные есть
+            if (Subst == "") { SimpleMsg(handler, "Error: No code entered"); return; }
+            if (Lab == "") { SimpleMsg(handler, "Error: No laboratory entered"); return; }
+            if (Person == "") { SimpleMsg(handler, "Error: No person entered"); return; }
+            if (Structure == "") { SimpleMsg(handler, "Error: No structure entered"); return; }
+            if (PhysState == "") { SimpleMsg(handler, "Error: No physical state entered"); return; }
+            if (Mass == "") { SimpleMsg(handler, "Error: No mass entered"); return; }
+            if (Solution == "") { SimpleMsg(handler, "Error: No solution entered"); return; }
+
+            // Добавление и шифровка
+            string queryString = @"INSERT INTO `molecules` 
+(`name`, `laboratory`, `person`, `b_structure`, `state`, `melting_point`, `conditions`, `other_properties`, `mass`, `solution`)
+VALUES (@Name, @Laboratory, @Person, @Structure, @State, @MeltingPoint, @Conditions, @OtherProperties, @Mass, @Solution);";
+
+            MySqlCommand com = DataBase.MakeCommandObject(queryString);
+            com.Parameters.AddWithValue("@Name", Subst);
+            com.Parameters.AddWithValue("@Laboratory", Lab);
+            com.Parameters.AddWithValue("@Person", Person);
+            com.Parameters.AddWithValue("@Structure", CommonAES.EncryptStringToBytes(Structure));
+            com.Parameters.AddWithValue("@State", CommonAES.EncryptStringToBytes(PhysState));
+            com.Parameters.AddWithValue("@MeltingPoint", CommonAES.EncryptStringToBytes(Melt));
+            com.Parameters.AddWithValue("@Conditions", CommonAES.EncryptStringToBytes(Conditions));
+            com.Parameters.AddWithValue("@OtherProperties", CommonAES.EncryptStringToBytes(Properties));
+            com.Parameters.AddWithValue("@Mass", CommonAES.EncryptStringToBytes(Mass));
+            com.Parameters.AddWithValue("@Solution", CommonAES.EncryptStringToBytes(Solution));
+
+            com.ExecuteNonQuery();
+
+            //И отпишемся.
+            SimpleMsg(handler, "Add_Molecule: done");
         }
 
         private static void RMRFUser(Socket handler, User CurUser, string[] Params)

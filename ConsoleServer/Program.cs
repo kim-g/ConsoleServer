@@ -20,49 +20,6 @@ namespace SocketServer
         // Отладочные команды. Для релиза поставить FALSE
         const bool DEBUG = true;
 
-        //Команды от клиента в нулевой строке
-        const string Search_Mol = "<@Search_Molecule@>";
-        const string Add_User = "<@Add_User@>";
-        const string Add_Mol = "<@Add_Molecule@>";
-        const string Login = "<@Login_User@>";
-        const string Status = "<@Next_Status@>";
-        const string GetStatuses = "<@Get_Status_List@>";
-        const string QuitMsg = "<@*Quit*@>";
-        const string FN_msg = "<@GetFileName@>";
-        const string Show_My_mol = "<@Show my molecules@>";  // Команда показать все молекулы
-        const string Increase_Status = "<@Increase status@>"; // Увеличеть значение статуса соединения
-        const string Show_New_Mol = "<@Show new molecules@>";  // Команда показать все молекулы новые
-        const string SendFileMsg = "<@*Send_File*@>";
-        const string GetFileMsg = "<@*Get_File*@>";
-
-        // Служебные команды
-        const string All_Users = "<@Show_All_Users@>";
-        const string ShowHash = "<@Show_Hash@>";
-        const string Help = "help";      // Справка по консоли администратора
-        // СК по базе
-        const string HelpDB = "database";    // Справка по использованию БД
-        const string LastID = "database.show_last_id";    // Показать последний использованный ID
-        // СК по журналу
-        const string HelpLog = "log";    // Справка по использованию журнала
-        const string SessionLog = "log.sessions";    // Показать список сессий
-        const string QueryLog = "log.queries";    // Показать список запросов.
-        // СК по пользователям
-        const string HelpUsers = "users";   // Справка по командам со списком пользователей.
-        const string UsersList = "users.list";  // Вывод всех пользователей
-        const string ActiveUsersList = "users.active";  // Вывод залогиненных пользователей
-        const string UsersAdd = "users.add";  // Добавление нового пользователя через консоль
-        const string UsersUpdate = "users.update";  // Изменение данных пользователя через консоль
-        const string UsersRemove = "users.remove";  // Скрытие пользователя и запрет ему на работу (запись не удаляется)
-        const string UsersRMRF = "users.rmrf";  // Удаление пользователя из БД.
-
-        // Ответные команды
-        const string LoginOK = "<@Login_OK@>";
-        const string LoginExp = "<@Login_Expired@>";
-        const string StartMsg = "<@Begin_Of_Session@>";
-        const string EndMsg = "<@End_Of_Session@>";
-        public const string Answer_Admin = "AdminOK";
-        public const string Answer_Manager = "ManagerOK";
-
         // Параметры БД
         static string DB_Server = "127.0.0.1";
         static string DB_Name = "mol_base";
@@ -291,12 +248,12 @@ namespace SocketServer
             List<string> Result = Get_Mol(CurUser, Mol, Request, Status);
 
             // Отправляем ответ клиенту\
-            SendMsg(handler, StartMsg);
+            SendMsg(handler, Commands.Answer.StartMsg);
             for (int i = 0; i < Result.Count(); i++)
             {
                 SendMsg(handler, Result[i]);
             }
-            SendMsg(handler, EndMsg);
+            SendMsg(handler, Commands.Answer.EndMsg);
         }
 
         static void Add_User_to_DB(Socket handler, User CurUser, string UserName, string Password)
@@ -304,14 +261,14 @@ namespace SocketServer
             if (CurUser.GetUserAddRermissions())
             {
                 User NewUser = new User(UserName, Password, "–", "–", UserName, 0, "1", "1", DataBase);
-                SendMsg(handler, StartMsg);
+                SendMsg(handler, Commands.Answer.StartMsg);
                 SendMsg(handler, "Add_User: done");
-                SendMsg(handler, EndMsg);
+                SendMsg(handler, Commands.Answer.EndMsg);
                 return;
             }
-            SendMsg(handler, StartMsg);
+            SendMsg(handler, Commands.Answer.StartMsg);
             SendMsg(handler, "Add_User: No permissions");
-            SendMsg(handler, EndMsg);
+            SendMsg(handler, Commands.Answer.EndMsg);
         }
 
         // Кодирует структуры заданным ключом. ADMIN ONLY
@@ -319,9 +276,9 @@ namespace SocketServer
         {
             if (!CurUser.GetAdminRermissions())
             {
-                SendMsg(handler, StartMsg);
+                SendMsg(handler, Commands.Answer.StartMsg);
                 SendMsg(handler, "ERROR: Access denied!");
-                SendMsg(handler, EndMsg);
+                SendMsg(handler, Commands.Answer.EndMsg);
                 return;
             }
 
@@ -332,9 +289,9 @@ namespace SocketServer
 
             DataTable dt = DataBase.Query(queryString);
 
-            SendMsg(handler, StartMsg);
+            SendMsg(handler, Commands.Answer.StartMsg);
             SendMsg(handler, "OK");
-            SendMsg(handler, EndMsg);
+            SendMsg(handler, Commands.Answer.EndMsg);
 
             for (int i = 0; i < dt.Rows.Count; i++)
             {
@@ -377,9 +334,9 @@ VALUES (@Name, @Laboratory, @Person, @Structure, @State, @MeltingPoint, @Conditi
 
             com.ExecuteNonQuery();
 
-            SendMsg(handler, StartMsg);
+            SendMsg(handler, Commands.Answer.StartMsg);
             SendMsg(handler, "Add_Molecule: done");
-            SendMsg(handler, EndMsg);
+            SendMsg(handler, Commands.Answer.EndMsg);
         }
 
         // Проверка имени пользователя и пароля
@@ -411,23 +368,23 @@ VALUES (@Name, @Laboratory, @Person, @Structure, @State, @MeltingPoint, @Conditi
                                     "WHERE `id` = " + LogID.ToString() + ";");
             }
 
-            SendMsg(handler, StartMsg);
-            SendMsg(handler, LoginOK);
+            SendMsg(handler, Commands.Answer.StartMsg);
+            SendMsg(handler, Commands.Answer.LoginOK);
             SendMsg(handler, NewUser.GetUserID());
             SendMsg(handler, NewUser.GetID().ToString());
             SendMsg(handler, NewUser.GetFullName());
-            if (NewUser.IsAdmin()) { SendMsg(handler, Answer_Admin); };
-            if (NewUser.IsManager()) { SendMsg(handler, Answer_Manager); };
-            SendMsg(handler, EndMsg);
+            if (NewUser.IsAdmin()) { SendMsg(handler, Commands.Answer.Answer_Admin); };
+            if (NewUser.IsManager()) { SendMsg(handler, Commands.Answer.Answer_Manager); };
+            SendMsg(handler, Commands.Answer.EndMsg);
         }
 
         static void SendStatusList(Socket handler)
         {
             List<string> Res = GetRows("SELECT * FROM `status`");
-            SendMsg(handler, StartMsg);
+            SendMsg(handler, Commands.Answer.StartMsg);
             for (int i = 0; i < Res.Count; i++)
                 SendMsg(handler, Res[i]);
-            SendMsg(handler, EndMsg);
+            SendMsg(handler, Commands.Answer.EndMsg);
         }
 
         // Программа для передачи файла из БД клиенту
@@ -455,8 +412,8 @@ VALUES (@Name, @Laboratory, @Person, @Structure, @State, @MeltingPoint, @Conditi
         // Передаёт клиенту размер файла
         static void SendFileSize(Socket handler, Files FileToSend)
         {
-            byte[] msg = Encoding.UTF8.GetBytes(StartMsg + "\n" + FileToSend.FileName + "\n" + FileToSend.Data.Count().ToString() + "\n");
-            Console.WriteLine(msg.Length.ToString() + "; \"" + msg + "\"");
+            byte[] msg = Encoding.UTF8.GetBytes(Commands.Answer.StartMsg + "\n" + FileToSend.FileName + "\n" + FileToSend.Data.Count().ToString() + "\n");
+            //Console.WriteLine(msg.Length.ToString() + "; \"" + msg + "\"");
             handler.Send(BitConverter.GetBytes(msg.Length));
             handler.Send(msg);
         }
@@ -470,9 +427,9 @@ VALUES (@Name, @Laboratory, @Person, @Structure, @State, @MeltingPoint, @Conditi
             Files FileToAdd = new Files(FileName, FileName, ResFile);
             FileToAdd.Add_To_DB(DataBase, CommonAES, 1, 1);
 
-            SendMsg(handler, StartMsg);
+            SendMsg(handler, Commands.Answer.StartMsg);
             SendMsg(handler, "OK");
-            SendMsg(handler, EndMsg);
+            SendMsg(handler, Commands.Answer.EndMsg);
         }
 
         // Программа для приёма файла от клиента
@@ -501,9 +458,9 @@ VALUES (@Name, @Laboratory, @Person, @Structure, @State, @MeltingPoint, @Conditi
             DataBase.ExecuteQuery(@"INSERT INTO `files_to_molecules` (`file`, `molecule`)
 VALUES (" + FileID + ", " + MoleculeID + ")");
 
-            SendMsg(handler, StartMsg);
+            SendMsg(handler, Commands.Answer.StartMsg);
             SendMsg(handler, FileID.ToString());
-            SendMsg(handler, EndMsg);
+            SendMsg(handler, Commands.Answer.EndMsg);
         }
 
         // Выход пользователя
@@ -511,9 +468,9 @@ VALUES (" + FileID + ", " + MoleculeID + ")");
         {
             CurUser.Quit("User Quited");
             Active_Users.Remove(CurUser);
-            SendMsg(handler, StartMsg);
+            SendMsg(handler, Commands.Answer.StartMsg);
             SendMsg(handler, "OK");
-            SendMsg(handler, EndMsg);
+            SendMsg(handler, Commands.Answer.EndMsg);
         }
 
 
@@ -580,14 +537,14 @@ VALUES (" + FileID + ", " + MoleculeID + ")");
                     // Ищем пользователя по его логину и защитной записи.
                     // Если дана команда входа в систему, то поиск не производим.
                     User CurUser = null;
-                    if (data_parse[0].Trim() != Login)
+                    if (data_parse[0].Trim() != Commands.Global.Login)
                     {
                         CurUser = GetCurUser(data_parse[1], data_parse[2]);
                         if (CurUser == null)
                         {
-                            SendMsg(handler, StartMsg);
-                            SendMsg(handler, LoginExp);
-                            SendMsg(handler, EndMsg);
+                            SendMsg(handler, Commands.Answer.StartMsg);
+                            SendMsg(handler, Commands.Answer.LoginExp);
+                            SendMsg(handler, Commands.Answer.EndMsg);
 
                             handler.Shutdown(SocketShutdown.Both);
                             handler.Close();
@@ -603,13 +560,13 @@ VALUES (" + FileID + ", " + MoleculeID + ")");
                     for (int i = 3; i < data_parse.Count(); i++)
                     {
                         if (i > 3) Params += "\n";
-                        if ((data_parse[0].Trim() == Login) && (i == 4))
+                        if ((data_parse[0].Trim() == Commands.Global.Login) && (i == 4))
                             Params += "*****";
                         else Params += data_parse[i];
                     }
 
                     // И добавляем в лог
-                    string LogQuery = data_parse[0].Trim() != Login
+                    string LogQuery = data_parse[0].Trim() != Commands.Global.Login
                         ? @"INSERT INTO `queries` (`user`, `session`,`ip`,`command`,`parameters`) 
 VALUES (" + CurUser.GetID().ToString() + ", " + CurUser.GetSessionID().ToString() +
 ", '" + ((IPEndPoint)handler.RemoteEndPoint).Address.ToString() + "', '" + data_parse[0] +
@@ -624,12 +581,12 @@ VALUES ('" + ((IPEndPoint)handler.RemoteEndPoint).Address.ToString() + "', '" + 
                     // Обрабатываем запрос
                     switch (data_parse[0].Trim())
                     {
-                        case Search_Mol:
+                        case Commands.Global.Search_Mol:
                             {
                                 Search_Molecules(handler, CurUser, data_parse[3]);
                                 break;
                             }
-                        case Add_User:
+                        case Commands.Global.Add_User:
                             {
                                 Add_User_to_DB(handler, CurUser, data_parse[3], data_parse[4]);
                                 break;
@@ -639,121 +596,122 @@ VALUES ('" + ((IPEndPoint)handler.RemoteEndPoint).Address.ToString() + "', '" + 
                                 EncryptAll(handler, CurUser);
                                 break;
                             }
-                        case Add_Mol:
+                        case Commands.Global.Add_Mol:
                             {
                                 AddMolecule(handler, CurUser, data_parse);
                                 break;
                             }
-                        case Login:
+                        case Commands.Global.Login:
                             {
                                 LoginMsg(handler, data_parse[3], data_parse[4], LogID);
                                 break;
                             }
 
-                        case All_Users:
+                        case Commands.Global.All_Users:
                             {
                                 AllUsersMsg(handler, CurUser);
                                 break;
                             }
-                        case ShowHash:
+                        case Commands.Global.ShowHash:
                             {
                                 if (!CurUser.IsAdmin()) { break; }
 
                                 string Password = data_parse[3].Trim(new char[] { "\n"[0], "\r"[0], ' ' });
-                                SendMsg(handler, StartMsg);
+                                SendMsg(handler, Commands.Answer.StartMsg);
                                 SendMsg(handler, User.GetPasswordHash(Password));
-                                SendMsg(handler, EndMsg);
+                                SendMsg(handler, Commands.Answer.EndMsg);
                                 break;
                             }
-                        case GetStatuses:
+                        case Commands.Global.GetStatuses:
                             {
                                 SendStatusList(handler);
                                 break;
                             }
-                        case SendFileMsg:
+                        case Commands.Global.SendFileMsg:
                             {
                                 SendFile(handler, CurUser, data_parse[3]);
                                 break;
                             }
-                        case GetFileMsg:
+                        case Commands.Global.GetFileMsg:
                             {
                                 GetFile(handler, CurUser, data_parse[3], data_parse[4], data_parse[5],
                                     data_parse[6]);
                                 break;
                             }
-                        case QuitMsg:
+                        case Commands.Global.QuitMsg:
                             {
                                 User_Quit(handler, CurUser);
                                 break;
                             }
-                        case FN_msg:
+                        case Commands.Global.FN_msg:
                             {
                                 GetFileName(handler, CurUser, data_parse[3]);
                                 break;
                             }
-                        case Show_My_mol:
+                        case Commands.Global.Show_My_mol:
                             {
                                 Search_Molecules(handler, CurUser, "", "My");
                                 break;
                             }
-                        case Increase_Status:
+                        case Commands.Global.Increase_Status:
                             {
                                 IncreaseStatus(handler, CurUser, data_parse[3]);
                                 break;
                             }
-                        case Show_New_Mol:
+                        case Commands.Global.Show_New_Mol:
                             {
                                 Search_Molecules(handler, CurUser, "", "Permission", 1);
                                 break;
                             }
-                        case Help:
+                        case Commands.Global.Help:
                             {
-                                SendMsg(handler, StartMsg);
+                                SendMsg(handler, Commands.Answer.StartMsg);
                                 SendMsg(handler, @"Administrator's console. Gives the direct access to server. Possible comands:
  - log - direct access to server's logs;
  - database - direct access to server's database;
- - users - direct access to list of users.");
-                                SendMsg(handler, EndMsg);
+ - users - direct access to list of users
+ - molecules - direct access to molecules list");
+                                SendMsg(handler, Commands.Answer.EndMsg);
                                 break;
                             }
-                        case LastID:
+                        case Commands.Database.LastID:
                             {
-                                SendMsg(handler, StartMsg);
+                                SendMsg(handler, Commands.Answer.StartMsg);
                                 SendMsg(handler, GetLastID(DataBase).ToString());
-                                SendMsg(handler, EndMsg);
+                                SendMsg(handler, Commands.Answer.EndMsg);
                                 break;
                             }
-                        case SessionLog:
+                        case Commands.Log.Session:
                             {
                                 ShowSessionLog(handler, CurUser, GetParameters(data_parse));
                                 break;
                             }
-                        case HelpLog:
+                        case Commands.Log.Help:
                             {
-                                SendMsg(handler, StartMsg);
+                                SendMsg(handler, Commands.Answer.StartMsg);
                                 SendMsg(handler, @"System logs. Shows informations aboute program usage. Possible comands:
  - log.sessions - shows sessions history
  - log.queries - shows query history.");
-                                SendMsg(handler, EndMsg);
+                                SendMsg(handler, Commands.Answer.EndMsg);
                                 break;
                             }
-                        case HelpDB:
+                        case Commands.Database.Help:
                             {
-                                SendMsg(handler, StartMsg);
+                                SendMsg(handler, Commands.Answer.StartMsg);
                                 SendMsg(handler, @"System database. Makes the direct access to DB commands. Possible comands:
  - database.show_last_id - shows ID key of the last inserted row.");
-                                SendMsg(handler, EndMsg);
+                                SendMsg(handler, Commands.Answer.EndMsg);
                                 break;
                             }
-                        case QueryLog:
+                        case Commands.Log.Query:
                             {
                                 ShowQueryLog(handler, CurUser, GetParameters(data_parse));
                                 break;
                             }
 
-                        case HelpUsers:
+                        case Commands.Users.Help:
                             {
-                                SendMsg(handler, StartMsg);
+                                SendMsg(handler, Commands.Answer.StartMsg);
                                 SendMsg(handler, @"List of users. Helps to manage user list. Possible comands:
  - users.list - shows all users;
  - users.active - shows currently logged in users;
@@ -761,35 +719,35 @@ VALUES ('" + ((IPEndPoint)handler.RemoteEndPoint).Address.ToString() + "', '" + 
  - users.update - changes user information
  - users.remove - delete user. May be reversible. Safe for work;
  - users.rmrf - delete the user's record. Irreversable.");
-                                SendMsg(handler, EndMsg);
+                                SendMsg(handler, Commands.Answer.EndMsg);
                                 break;
                             }
-                        case UsersList:
+                        case Commands.Users.List:
                             {
                                 ShowUsersList(handler, CurUser, GetParameters(data_parse));
                                 break;
                             }
-                        case ActiveUsersList:
+                        case Commands.Users.ActiveUsersList:
                             {
                                 ShowActiveUsersList(handler, CurUser, GetParameters(data_parse));
                                 break;
                             }
-                        case UsersAdd:
+                        case Commands.Users.Add:
                             {
                                 AddUser(handler, CurUser, GetParameters(data_parse));
                                 break;
                             }
-                        case UsersUpdate:
+                        case Commands.Users.Update:
                             {
                                 UpdateUser(handler, CurUser, GetParameters(data_parse));
                                 break;
                             }
-                        case UsersRemove:
+                        case Commands.Users.Remove:
                             {
                                 RemoveUser(handler, CurUser, GetParameters(data_parse));
                                 break;
                             }
-                        case UsersRMRF:
+                        case Commands.Users.RMRF:
                             {
                                 RMRFUser(handler, CurUser, GetParameters(data_parse));
                                 break;
@@ -799,9 +757,9 @@ VALUES ('" + ((IPEndPoint)handler.RemoteEndPoint).Address.ToString() + "', '" + 
                                 DataBase.ExecuteQuery("UPDATE `queries` SET `comment` = '! Unknown command' " +
                                     "WHERE `id` = " + LogID.ToString() + ";");
 
-                                SendMsg(handler, StartMsg);
+                                SendMsg(handler, Commands.Answer.StartMsg);
                                 SendMsg(handler, "Error 1: Unknown command in line 0");
-                                SendMsg(handler, EndMsg);
+                                SendMsg(handler, Commands.Answer.EndMsg);
                                 break;
                             }
                     }
@@ -913,10 +871,10 @@ VALUES ('" + ((IPEndPoint)handler.RemoteEndPoint).Address.ToString() + "', '" + 
 
         private static void Users_Remove_Help(Socket handler)
         {
-            SendMsg(handler, StartMsg);
+            SendMsg(handler, Commands.Answer.StartMsg);
             SendMsg(handler, @"Command to remove user from the system. Reversible. Safe. Parameters may include:
  - login [login] - login of user to remove.");
-            SendMsg(handler, EndMsg);
+            SendMsg(handler, Commands.Answer.EndMsg);
         }
 
         private static string[] GetParameters(string[] data_parse)
@@ -958,18 +916,18 @@ VALUES ('" + ((IPEndPoint)handler.RemoteEndPoint).Address.ToString() + "', '" + 
         {
             if (!CurUser.GetAdminRermissions())
             {
-                SendMsg(handler, StartMsg);
+                SendMsg(handler, Commands.Answer.StartMsg);
                 SendMsg(handler, "ERROR: Access denied!");
-                SendMsg(handler, EndMsg);
+                SendMsg(handler, Commands.Answer.EndMsg);
                 return;
             }
 
-            SendMsg(handler, StartMsg);
+            SendMsg(handler, Commands.Answer.StartMsg);
             foreach (User U in Active_Users)
             {
                 SendMsg(handler, U.GetLogin() + " -> " + U.GetUserID());
             }
-            SendMsg(handler, EndMsg);
+            SendMsg(handler, Commands.Answer.EndMsg);
         }
 
         private static void GetFileName(Socket handler, User CurUser, string FileID)
@@ -980,9 +938,7 @@ VALUES ('" + ((IPEndPoint)handler.RemoteEndPoint).Address.ToString() + "', '" + 
             if (NewFile.Rows.Count == 0) { Out = "Файл отсутствует"; }
             else { Out = NewFile.Rows[0].ItemArray[0].ToString(); }
 
-            SendMsg(handler, StartMsg);
-            SendMsg(handler, Out);
-            SendMsg(handler, EndMsg);
+            SimpleMsg(handler, Out);
         }
 
         // Изменить статус на 1
@@ -992,25 +948,19 @@ VALUES ('" + ((IPEndPoint)handler.RemoteEndPoint).Address.ToString() + "', '" + 
                             MolID + @") AND (" + CurUser.GetSearchRermissions() + @") LIMIT 1;");
             if (MolStatus.Rows.Count == 0)
             {
-                SendMsg(handler, StartMsg);
-                SendMsg(handler, "ERROR 101 – Not found or access denied");
-                SendMsg(handler, EndMsg);
+                SimpleMsg(handler, "ERROR 101 – Not found or access denied");
                 return;
             }
             DataTable NewStatus = DataBase.Query(@"SELECT `next` FROM `status` WHERE (`id`=" +
                             MolStatus.Rows[0].ItemArray[0].ToString() + @") LIMIT 1;");
             if (NewStatus.Rows.Count == 0)
             {
-                SendMsg(handler, StartMsg);
-                SendMsg(handler, "ERROR 102 – Status not found");
-                SendMsg(handler, EndMsg);
+                SimpleMsg(handler, "ERROR 102 – Status not found");
                 return;
             }
             if (NewStatus.Rows[0].ItemArray[0].ToString() == "-1")
             {
-                SendMsg(handler, StartMsg);
-                SendMsg(handler, "ERROR 103 – Maximum status");
-                SendMsg(handler, EndMsg);
+                SimpleMsg(handler, "ERROR 103 – Maximum status");
                 return;
             }
             if (DEBUG) Console.WriteLine(NewStatus.Rows[0].ItemArray[0]);
@@ -1018,9 +968,7 @@ VALUES ('" + ((IPEndPoint)handler.RemoteEndPoint).Address.ToString() + "', '" + 
             // Если ни одной ошибки не обнаружено, увеличиваем статус
             DataBase.ExecuteQuery(@"UPDATE `molecules` SET `status` = " +
                 NewStatus.Rows[0].ItemArray[0].ToString() + @" WHERE `id` = " + MolID + @" LIMIT 1;");
-            SendMsg(handler, StartMsg);
-            SendMsg(handler, "OK");
-            SendMsg(handler, EndMsg);
+            SimpleMsg(handler, "OK");
         }
 
         public static int GetLastID(DB DataBase)
@@ -1074,8 +1022,7 @@ INNER JOIN `persons` ON (`persons`.`id` = `sessions`.`user`)";
                 // Служебные
                 if (Param[0] == "help")     // Помощь
                 {
-                    SendMsg(handler, StartMsg);
-                    SendMsg(handler, @"log.sessions shows list of sessions. There are several filter parameters:
+                    SimpleMsg(handler, @"log.sessions shows list of sessions. There are several filter parameters:
 
  - person [login] - Show only person's sessions;
  - date YYYY-MM-DD - Shows sessions that started or ended in this day;
@@ -1086,7 +1033,6 @@ INNER JOIN `persons` ON (`persons`.`id` = `sessions`.`user`)";
  - active - Shows only current working sessions.
 
 Parameters may be combined.");
-                    SendMsg(handler, EndMsg);
                     return;
                 }
             }
@@ -1145,7 +1091,7 @@ Parameters may be combined.");
             DataTable Res = DataBase.Query(Query);
 
             // И отошлём всё.
-            SendMsg(handler, StartMsg);
+            SendMsg(handler, Commands.Answer.StartMsg);
             SendMsg(handler, Query);
             SendMsg(handler, "| ID\t | Start date   time  \t | End   date   time  \t | User            | IP              | Reason");
             SendMsg(handler, "|--------|-----------------------|-----------------------|-----------------|-----------------|-----------------------------------");
@@ -1167,7 +1113,7 @@ Parameters may be combined.");
                 msg += Res.Rows[i].ItemArray[5].ToString() + "\t";
                 SendMsg(handler, msg);
             }
-            SendMsg(handler, EndMsg);
+            SendMsg(handler, Commands.Answer.EndMsg);
         }
 
         // Показ журнала запросов
@@ -1214,8 +1160,7 @@ INNER JOIN persons ON(persons.id = queries.user)";
                 // Служебные
                 if (Param[0] == "help")     // Помощь
                 {
-                    SendMsg(handler, StartMsg);
-                    SendMsg(handler, @"log.queries shows list of users' queries to server. All queries are logged. There are several filter parameters:
+                    SimpleMsg(handler, @"log.queries shows list of users' queries to server. All queries are logged. There are several filter parameters:
 
  - person [login] - Show only person's queries;
  - date YYYY-MM-DD - Shows queries that were in this day;
@@ -1228,7 +1173,6 @@ INNER JOIN persons ON(persons.id = queries.user)";
  - comment - Shoqs queries with certain comment. Commens starts with symbols '!' - Not important, '!!' - important, '!!!' - very important. You may filter by this symbols.
 
 Parameters may be combined.");
-                    SendMsg(handler, EndMsg);
                     return;
                 }
             }
@@ -1279,7 +1223,7 @@ Parameters may be combined.");
             DataTable Res = DataBase.Query(Query);
 
             // И пошлём всё пользователю.
-            SendMsg(handler, StartMsg);
+            SendMsg(handler, Commands.Answer.StartMsg);
             SendMsg(handler, "| ID     | user            | session | IP              | Date                | Command (Parameters) – Comment");
             SendMsg(handler, "|--------|-----------------|---------|-----------------|---------------------|-----------------------------------");
 
@@ -1302,7 +1246,7 @@ Parameters may be combined.");
                 msg += Res.Rows[i].ItemArray[7].ToString() + "";
                 SendMsg(handler, msg);
             }
-            SendMsg(handler, EndMsg);
+            SendMsg(handler, Commands.Answer.EndMsg);
         }
 
         public static bool IsAdmin(Socket handler, User CurUser)
@@ -1321,9 +1265,7 @@ Parameters may be combined.");
             int Num = User.GetIDByLogin(DataBase, Name);
             if (Num == -1)
             {
-                SendMsg(handler, StartMsg);
-                SendMsg(handler, "ERROR – UNKNOWN USER '" + Name + "'");
-                SendMsg(handler, EndMsg);
+                SimpleMsg(handler, "ERROR – UNKNOWN USER '" + Name + "'");
                 return "NoUser";
             }
             return Num.ToString();
@@ -1360,8 +1302,7 @@ INNER JOIN `laboratory` ON (`laboratory`.`id` = `persons`.`laboratory`)";
                 // Служебные
                 if (Param[0] == "help")     // Помощь
                 {
-                    SendMsg(handler, StartMsg);
-                    SendMsg(handler, @"user.list shows list of all users on the server. There are several filter parameters:
+                    SimpleMsg(handler, @"user.list shows list of all users on the server. There are several filter parameters:
 
  - surname [Name] - Show persons with surname containings [Name];
  - laboratory [ABB] - Shows persons of this laboratory;
@@ -1370,7 +1311,6 @@ INNER JOIN `laboratory` ON (`laboratory`.`id` = `persons`.`laboratory`)";
  - login [Name] - Show persons with login containings [Name];
 
 Parameters may be combined.");
-                    SendMsg(handler, EndMsg);
                     return;
                 }
             }
@@ -1397,7 +1337,7 @@ Parameters may be combined.");
             DataTable Res = DataBase.Query(Query);
 
             // И пошлём всё пользователю.
-            SendMsg(handler, StartMsg);
+            SendMsg(handler, Commands.Answer.StartMsg);
             SendMsg(handler, "| ID     | Surname              | Name                 | Second Name          | login           | Lab.  | Job        | Perm. |");
             SendMsg(handler, "|--------|----------------------|----------------------|----------------------|-----------------|-------|------------|-------|");
 
@@ -1423,7 +1363,7 @@ Parameters may be combined.");
                     new String(' ', 5 - Res.Rows[i].ItemArray[6].ToString().Length) + " | ";
                 SendMsg(handler, msg);
             }
-            SendMsg(handler, EndMsg);
+            SendMsg(handler, Commands.Answer.EndMsg);
         }
 
         // Показать всех залогиненых пользователей
@@ -1432,7 +1372,7 @@ Parameters may be combined.");
             // Если не админ, то ничего не покажем!
             if (!IsAdmin(handler, CurUser)) return;
 
-            SendMsg(handler, StartMsg);
+            SendMsg(handler, Commands.Answer.StartMsg);
             foreach (User U in Active_Users)
             {
                 string msg = "| " + U.GetID().ToString() +
@@ -1457,7 +1397,7 @@ Parameters may be combined.");
 
                 SendMsg(handler, msg);
             }
-            SendMsg(handler, EndMsg);
+            SendMsg(handler, Commands.Answer.EndMsg);
         }
 
         // Добавить нового пользователя через командную строку
@@ -1499,8 +1439,7 @@ Parameters may be combined.");
                 // Помощь
                 if (Param[0] == "help")
                 {
-                    SendMsg(handler, StartMsg);
-                    SendMsg(handler, @"Command to add new user. Please, enter all information about the user. Parameters must include:
+                    SimpleMsg(handler, @"Command to add new user. Please, enter all information about the user. Parameters must include:
  - name [Name] - person's first name
  - second.name [Name] - person's second name. May be empty.
  - surname [Name] - person's surname.
@@ -1518,7 +1457,6 @@ Parameters may be combined.");
    - 11 - Manager. Able to add and get all institute's molecules. Able to rewind queries statuses.
  - laboratory [Abbr.] - laboratory's abbreviation.
  - job [Name] - person's job.");
-                    SendMsg(handler, EndMsg);
                 }
 
             }
@@ -1616,8 +1554,7 @@ Parameters may be combined.");
                 // Помощь
                 if (Param[0] == "help")
                 {
-                    SendMsg(handler, StartMsg);
-                    SendMsg(handler, @"Command to update user's information. Parameters may include:
+                    SimpleMsg(handler, @"Command to update user's information. Parameters may include:
  - login [login] - login of user to change
  - name [Name] - person's first name
  - second.name [Name] - person's second name. May be empty.
@@ -1637,7 +1574,6 @@ Parameters may be combined.");
    - 11 - Manager. Able to add and get all institute's molecules. Able to rewind queries statuses.
  - laboratory [Abbr.] - laboratory's abbreviation.
  - job [Name] - person's job.");
-                    SendMsg(handler, EndMsg);
                     return;
                 }
 
@@ -1724,11 +1660,11 @@ Parameters may be combined.");
         }
 
 
-        private static void SimpleMsg(Socket handler, string Error)
+        private static void SimpleMsg(Socket handler, string Message)
         {
-            SendMsg(handler, StartMsg);
-            SendMsg(handler, Error);
-            SendMsg(handler, EndMsg);
+            SendMsg(handler, Commands.Answer.StartMsg);
+            SendMsg(handler, Message);
+            SendMsg(handler, Commands.Answer.EndMsg);
         }
     }
 }

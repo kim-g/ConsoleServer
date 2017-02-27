@@ -68,7 +68,18 @@ namespace Commands
     class Molecules
     {
         // Команды по молекулам
-        public const string Help = "molecules";   // справка по командам molecules
-        public const string Add = "molecules.add";   // справка по командам molecules
+        public const string Help = "molecules";             // справка по командам molecules
+        public const string Add = "molecules.add";          // Добавление молекулы
+        public const string Search = "molecule.search";     // Поиск по молекулам
+    }
+
+    class Laboratories
+    {
+        // Команды по лабораториям
+        public const string Help    = "laboratories";          // справка по командам laboratories
+        public const string Add     = "laboratories.add";      // Добавление новой лаборатории
+        public const string Edit    = "laboratories.update";   // Изменение лаборатории
+        public const string List    = "laboratories.list";     // Вывод лабораторий на консоль
+        public const string Names   = "laboratories.names";    // Вывод ID и имён лабораторий 
     }
 }

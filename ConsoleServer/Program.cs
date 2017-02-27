@@ -759,6 +759,11 @@ VALUES ('" + ((IPEndPoint)handler.RemoteEndPoint).Address.ToString() + "', '" + 
                                 Molecule_Add(handler, CurUser, GetParameters(data_parse));
                                 break;
                             }
+                        case Commands.Molecules.Search:
+                            {
+                                Molecule_Search(handler, CurUser, GetParameters(data_parse));
+                                break;
+                            }
                         default:
                             {
                                 DataBase.ExecuteQuery("UPDATE `queries` SET `comment` = '! Unknown command' " +
@@ -791,6 +796,11 @@ VALUES ('" + ((IPEndPoint)handler.RemoteEndPoint).Address.ToString() + "', '" + 
             {
                 Console.ReadLine();
             }
+        }
+
+        private static void Molecule_Search(Socket handler, User CurUser, string[] Params)
+        {
+            throw new NotImplementedException();
         }
 
         private static void Molecule_Add(Socket handler, User CurUser, string[] Params)

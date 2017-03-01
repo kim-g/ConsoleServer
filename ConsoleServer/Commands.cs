@@ -1,10 +1,35 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Net.Sockets;
 using System.Text;
+using ConsoleServer;
 
 namespace Commands
 {
+
+    class ExecutableCommand
+    {
+        public static void SimpleMsg(Socket handler, string Message)
+        {
+            SocketServer.Program.SendMsg(handler, Answer.StartMsg);
+            SocketServer.Program.SendMsg(handler, Message);
+            SocketServer.Program.SendMsg(handler, Answer.EndMsg);
+        }
+
+        public static string AllParam(string[] Param)
+        {
+            string Text = Param[1].Replace("\n", "").Replace("\r", "");
+            for (int j = 2; j < Param.Count(); j++)
+                Text += " " + Param[j].Replace("\n", "").Replace("\r", "");
+            return Text;
+        }
+
+        public static string SimpleParam(string[] Param)
+        {
+            return Param[1].Replace("\n", "").Replace("\r", "");
+        }
+    }
 
     class Global
     {
@@ -73,13 +98,153 @@ namespace Commands
         public const string Search = "molecule.search";     // Поиск по молекулам
     }
 
-    class Laboratories
+    class Laboratories: ExecutableCommand
     {
         // Команды по лабораториям
-        public const string Help    = "laboratories";          // справка по командам laboratories
-        public const string Add     = "laboratories.add";      // Добавление новой лаборатории
-        public const string Edit    = "laboratories.update";   // Изменение лаборатории
-        public const string List    = "laboratories.list";     // Вывод лабораторий на консоль
-        public const string Names   = "laboratories.names";    // Вывод ID и имён лабораторий 
+        public const string Name    = "laboratories";           // Название корневой команды
+        public const string Help    = "help";                   // справка по командам laboratories
+        public const string Add     = "add";                    // Добавление новой лаборатории
+        public const string Edit    = "update";                 // Изменение лаборатории
+        public const string List    = "list";                   // Вывод лабораторий на консоль
+        public const string Names   = "names";                  // Вывод ID и имён лабораторий 
+
+        public static void Execute(Socket handler, User CurUser, DB DataBase, string [] Command, string [] Params)
+        {
+            if (Command.Length == 1)
+            {
+                SendHelp(handler);
+                return;
+            } 
+
+            switch (Command[1])
+            {
+                case Help: SendHelp(handler); break;
+                case Add: AddLaboratory(handler, CurUser, DataBase, Params); break;
+                case Edit: UpdateLaboratory(handler, CurUser, DataBase, Params); break;
+            }
+        }
+
+        private static void SendHelp(Socket handler)
+        {
+            SimpleMsg(handler, @"List of laboratories. Helps to manage it. Possible comands:
+ - users.list - shows all users;
+ - users.add - Adds new laboratory
+ - users.update - changes laboratory information
+ - users.names - Shows list of IDs and Names of laboratories.");
+        }
+
+        private static void AddLaboratory(Socket handler, User CurUser, DB DataBase, string[] Params)
+        {
+            // Если не админ и не менеджер, то ничего не покажем!
+            if (!CurUser.GetUserAddRermissions())
+            {
+                SimpleMsg(handler, "Access denied");
+                return;
+            }
+
+            // Начальная инициация переменных, чтобы из IF(){} вышли
+            string LName = "";
+            string LAbbr = "";
+
+            // Ищем данные
+            foreach (string Line in Params)
+            {
+                string[] Param = Line.Split(' ');
+
+                if (Param[0] == "name") LName = AllParam(Param);
+                if (Param[0] == "abb") LAbbr = SimpleParam(Param);
+
+                // Помощь
+                if (Param[0] == "help")
+                {
+                    SimpleMsg(handler, @"Command to add new Laboratory. Please, enter all information about the Laboratory. Parameters must include:
+ - name [Name] - laboratory's full name
+ - abb [ABB] - laboratory's abbriviation.");
+                    return;
+                }
+            }
+
+            // Проверяем данные
+            if (LName == "")
+            {
+                SimpleMsg(handler, "Enter name of laboratory");
+                return;
+            }
+            if (LAbbr == "")
+            {
+                SimpleMsg(handler, "Enter abbrivation of laboratory");
+                return;
+            }
+
+            // Добавляем в базу
+            DataBase.ExecuteQuery("INSERT INTO `laboratory` (`name`, `abbr`) VALUES  ('" + 
+                LName + "','" + LAbbr + "')");
+            SimpleMsg(handler, "Laboratory added successfully");
+        }
+
+        private static void UpdateLaboratory(Socket handler, User CurUser, DB DataBase, string[] Params)
+        {
+            // Если не админ и не менеджер, то ничего не покажем!
+            if (!CurUser.GetUserAddRermissions())
+            {
+                SimpleMsg(handler, "Access denied");
+                return;
+            }
+
+            // Начальная инициация переменных, чтобы из IF(){} вышли
+            string ID = "";
+            string LName = "";
+            string LAbbr = "";
+
+            // Ищем данные
+            foreach (string Line in Params)
+            {
+                string[] Param = Line.Split(' ');
+
+                if (Param[0] == "id") ID = SimpleParam(Param);
+                if (Param[0] == "name") LName = AllParam(Param);
+                if (Param[0] == "abb") LAbbr = SimpleParam(Param);
+
+                // Помощь
+                if (Param[0] == "help")
+                {
+                    SimpleMsg(handler, @"Command to add new Laboratory. Please, enter all information about the Laboratory. Parameters must include:
+ - name [Name] - laboratory's full name
+ - abb [ABB] - laboratory's abbriviation.");
+                    return;
+                }
+            }
+
+            // Проверяем данные
+            if (ID == "")
+            {
+                SimpleMsg(handler, "No ID entered");
+                return;
+            }
+            if (DataBase.RecordsCount("laboratory","`id`=" + ID) == 0)
+            {
+                SimpleMsg(handler, "Laboratory with ID = " + ID + " was not found");
+                return;
+            }
+            if (LName == "" && LAbbr == "")
+            {
+                SimpleMsg(handler, "Error: Nothing to change");
+                return;
+            }
+
+            string Addition = "";
+            if (LName != "")
+                Addition += " `name`='" + LName + "'";
+            if (LAbbr != "")
+            {
+                if (Addition.Length > 0)
+                    Addition += ",";
+                Addition += " `abbr`='" + LAbbr + "'";
+            }
+
+            // Добавляем в базу
+            DataBase.ExecuteQuery("UPDATE `laboratory` SET " + Addition + " WHERE `id`=" + ID + " LIMIT 1;");
+            SimpleMsg(handler, "Laboratory updated successfully");
+        }
     }
 }

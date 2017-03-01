@@ -38,7 +38,7 @@ namespace SocketServer
         // Время бездействия пользователя до принудительного выхода
         const int UserTimeOut = 3600;
 
-        static void SendMsg(Socket handler, string Msg)
+        public static void SendMsg(Socket handler, string Msg)
         {
             byte[] msg = Encoding.UTF8.GetBytes(Msg + "\n");
             handler.Send(msg);
@@ -579,202 +579,211 @@ VALUES ('" + ((IPEndPoint)handler.RemoteEndPoint).Address.ToString() + "', '" + 
                     DataBase.ExecuteQuery(LogQuery);
                     int LogID = GetLastID(DataBase);
 
+                    // Обработка классом Commands.
 
-                    // Обрабатываем запрос
-                    switch (data_parse[0].Trim())
+                    string[] Command = data_parse[0].Split('.');
+                    if (Command[0] == Commands.Laboratories.Name)
                     {
-                        case Commands.Global.Search_Mol:
-                            {
-                                Search_Molecules(handler, CurUser, data_parse[3]);
-                                break;
-                            }
-                        case Commands.Global.Add_User:
-                            {
-                                Add_User_to_DB(handler, CurUser, data_parse[3], data_parse[4]);
-                                break;
-                            }
-                        case "<@Encrypt_All@>":
-                            {
-                                EncryptAll(handler, CurUser);
-                                break;
-                            }
-                        case Commands.Global.Add_Mol:
-                            {
-                                AddMolecule(handler, CurUser, data_parse);
-                                break;
-                            }
-                        case Commands.Global.Login:
-                            {
-                                LoginMsg(handler, data_parse[3], data_parse[4], LogID);
-                                break;
-                            }
+                        Commands.Laboratories.Execute(handler, CurUser, DataBase, Command,
+                            GetParameters(data_parse));
+                    }
 
-                        case Commands.Global.All_Users:
-                            {
-                                AllUsersMsg(handler, CurUser);
-                                break;
-                            }
-                        case Commands.Global.ShowHash:
-                            {
-                                if (!CurUser.IsAdmin()) { break; }
 
-                                string Password = data_parse[3].Trim(new char[] { "\n"[0], "\r"[0], ' ' });
-                                SendMsg(handler, Commands.Answer.StartMsg);
-                                SendMsg(handler, User.GetPasswordHash(Password));
-                                SendMsg(handler, Commands.Answer.EndMsg);
-                                break;
-                            }
-                        case Commands.Global.GetStatuses:
-                            {
-                                SendStatusList(handler);
-                                break;
-                            }
-                        case Commands.Global.SendFileMsg:
-                            {
-                                SendFile(handler, CurUser, data_parse[3]);
-                                break;
-                            }
-                        case Commands.Global.GetFileMsg:
-                            {
-                                GetFile(handler, CurUser, data_parse[3], data_parse[4], data_parse[5],
-                                    data_parse[6]);
-                                break;
-                            }
-                        case Commands.Global.QuitMsg:
-                            {
-                                User_Quit(handler, CurUser);
-                                break;
-                            }
-                        case Commands.Global.FN_msg:
-                            {
-                                GetFileName(handler, CurUser, data_parse[3]);
-                                break;
-                            }
-                        case Commands.Global.Show_My_mol:
-                            {
-                                Search_Molecules(handler, CurUser, "", "My");
-                                break;
-                            }
-                        case Commands.Global.Increase_Status:
-                            {
-                                IncreaseStatus(handler, CurUser, data_parse[3]);
-                                break;
-                            }
-                        case Commands.Global.Show_New_Mol:
-                            {
-                                Search_Molecules(handler, CurUser, "", "Permission", 1);
-                                break;
-                            }
-                        case Commands.Global.Help:
-                            {
-                                SendMsg(handler, Commands.Answer.StartMsg);
-                                SendMsg(handler, @"Administrator's console. Gives the direct access to server. Possible comands:
+                        // Обрабатываем запрос в оставшихся случаях.
+                        switch (data_parse[0].Trim())
+                        {
+                            case Commands.Global.Search_Mol:
+                                {
+                                    Search_Molecules(handler, CurUser, data_parse[3]);
+                                    break;
+                                }
+                            case Commands.Global.Add_User:
+                                {
+                                    Add_User_to_DB(handler, CurUser, data_parse[3], data_parse[4]);
+                                    break;
+                                }
+                            case "<@Encrypt_All@>":
+                                {
+                                    EncryptAll(handler, CurUser);
+                                    break;
+                                }
+                            case Commands.Global.Add_Mol:
+                                {
+                                    AddMolecule(handler, CurUser, data_parse);
+                                    break;
+                                }
+                            case Commands.Global.Login:
+                                {
+                                    LoginMsg(handler, data_parse[3], data_parse[4], LogID);
+                                    break;
+                                }
+
+                            case Commands.Global.All_Users:
+                                {
+                                    AllUsersMsg(handler, CurUser);
+                                    break;
+                                }
+                            case Commands.Global.ShowHash:
+                                {
+                                    if (!CurUser.IsAdmin()) { break; }
+
+                                    string Password = data_parse[3].Trim(new char[] { "\n"[0], "\r"[0], ' ' });
+                                    SendMsg(handler, Commands.Answer.StartMsg);
+                                    SendMsg(handler, User.GetPasswordHash(Password));
+                                    SendMsg(handler, Commands.Answer.EndMsg);
+                                    break;
+                                }
+                            case Commands.Global.GetStatuses:
+                                {
+                                    SendStatusList(handler);
+                                    break;
+                                }
+                            case Commands.Global.SendFileMsg:
+                                {
+                                    SendFile(handler, CurUser, data_parse[3]);
+                                    break;
+                                }
+                            case Commands.Global.GetFileMsg:
+                                {
+                                    GetFile(handler, CurUser, data_parse[3], data_parse[4], data_parse[5],
+                                        data_parse[6]);
+                                    break;
+                                }
+                            case Commands.Global.QuitMsg:
+                                {
+                                    User_Quit(handler, CurUser);
+                                    break;
+                                }
+                            case Commands.Global.FN_msg:
+                                {
+                                    GetFileName(handler, CurUser, data_parse[3]);
+                                    break;
+                                }
+                            case Commands.Global.Show_My_mol:
+                                {
+                                    Search_Molecules(handler, CurUser, "", "My");
+                                    break;
+                                }
+                            case Commands.Global.Increase_Status:
+                                {
+                                    IncreaseStatus(handler, CurUser, data_parse[3]);
+                                    break;
+                                }
+                            case Commands.Global.Show_New_Mol:
+                                {
+                                    Search_Molecules(handler, CurUser, "", "Permission", 1);
+                                    break;
+                                }
+                            case Commands.Global.Help:
+                                {
+                                    SendMsg(handler, Commands.Answer.StartMsg);
+                                    SendMsg(handler, @"Administrator's console. Gives the direct access to server. Possible comands:
  - log - direct access to server's logs;
  - database - direct access to server's database;
  - users - direct access to list of users
  - molecules - direct access to molecules list");
-                                SendMsg(handler, Commands.Answer.EndMsg);
-                                break;
-                            }
-                        case Commands.Database.LastID:
-                            {
-                                SendMsg(handler, Commands.Answer.StartMsg);
-                                SendMsg(handler, GetLastID(DataBase).ToString());
-                                SendMsg(handler, Commands.Answer.EndMsg);
-                                break;
-                            }
-                        case Commands.Log.Session:
-                            {
-                                ShowSessionLog(handler, CurUser, GetParameters(data_parse));
-                                break;
-                            }
-                        case Commands.Log.Help:
-                            {
-                                SendMsg(handler, Commands.Answer.StartMsg);
-                                SendMsg(handler, @"System logs. Shows informations aboute program usage. Possible comands:
+                                    SendMsg(handler, Commands.Answer.EndMsg);
+                                    break;
+                                }
+                            case Commands.Database.LastID:
+                                {
+                                    SendMsg(handler, Commands.Answer.StartMsg);
+                                    SendMsg(handler, GetLastID(DataBase).ToString());
+                                    SendMsg(handler, Commands.Answer.EndMsg);
+                                    break;
+                                }
+                            case Commands.Log.Session:
+                                {
+                                    ShowSessionLog(handler, CurUser, GetParameters(data_parse));
+                                    break;
+                                }
+                            case Commands.Log.Help:
+                                {
+                                    SendMsg(handler, Commands.Answer.StartMsg);
+                                    SendMsg(handler, @"System logs. Shows informations aboute program usage. Possible comands:
  - log.sessions - shows sessions history
  - log.queries - shows query history.");
-                                SendMsg(handler, Commands.Answer.EndMsg);
-                                break;
-                            }
-                        case Commands.Database.Help:
-                            {
-                                SendMsg(handler, Commands.Answer.StartMsg);
-                                SendMsg(handler, @"System database. Makes the direct access to DB commands. Possible comands:
+                                    SendMsg(handler, Commands.Answer.EndMsg);
+                                    break;
+                                }
+                            case Commands.Database.Help:
+                                {
+                                    SendMsg(handler, Commands.Answer.StartMsg);
+                                    SendMsg(handler, @"System database. Makes the direct access to DB commands. Possible comands:
  - database.show_last_id - shows ID key of the last inserted row.");
-                                SendMsg(handler, Commands.Answer.EndMsg);
-                                break;
-                            }
-                        case Commands.Log.Query:
-                            {
-                                ShowQueryLog(handler, CurUser, GetParameters(data_parse));
-                                break;
-                            }
+                                    SendMsg(handler, Commands.Answer.EndMsg);
+                                    break;
+                                }
+                            case Commands.Log.Query:
+                                {
+                                    ShowQueryLog(handler, CurUser, GetParameters(data_parse));
+                                    break;
+                                }
 
-                        case Commands.Users.Help:
-                            {
-                                SendMsg(handler, Commands.Answer.StartMsg);
-                                SendMsg(handler, @"List of users. Helps to manage user list. Possible comands:
+                            case Commands.Users.Help:
+                                {
+                                    SendMsg(handler, Commands.Answer.StartMsg);
+                                    SendMsg(handler, @"List of users. Helps to manage user list. Possible comands:
  - users.list - shows all users;
  - users.active - shows currently logged in users;
  - users.add - Adds new user
  - users.update - changes user information
  - users.remove - delete user. May be reversible. Safe for work;
  - users.rmrf - delete the user's record. Irreversable.");
-                                SendMsg(handler, Commands.Answer.EndMsg);
-                                break;
-                            }
-                        case Commands.Users.List:
-                            {
-                                ShowUsersList(handler, CurUser, GetParameters(data_parse));
-                                break;
-                            }
-                        case Commands.Users.ActiveUsersList:
-                            {
-                                ShowActiveUsersList(handler, CurUser, GetParameters(data_parse));
-                                break;
-                            }
-                        case Commands.Users.Add:
-                            {
-                                AddUser(handler, CurUser, GetParameters(data_parse));
-                                break;
-                            }
-                        case Commands.Users.Update:
-                            {
-                                UpdateUser(handler, CurUser, GetParameters(data_parse));
-                                break;
-                            }
-                        case Commands.Users.Remove:
-                            {
-                                RemoveUser(handler, CurUser, GetParameters(data_parse));
-                                break;
-                            }
-                        case Commands.Users.RMRF:
-                            {
-                                RMRFUser(handler, CurUser, GetParameters(data_parse));
-                                break;
-                            }
-                        case Commands.Molecules.Add:
-                            {
-                                Molecule_Add(handler, CurUser, GetParameters(data_parse));
-                                break;
-                            }
-                        case Commands.Molecules.Search:
-                            {
-                                Molecule_Search(handler, CurUser, GetParameters(data_parse));
-                                break;
-                            }
-                        default:
-                            {
-                                DataBase.ExecuteQuery("UPDATE `queries` SET `comment` = '! Unknown command' " +
-                                    "WHERE `id` = " + LogID.ToString() + ";");
+                                    SendMsg(handler, Commands.Answer.EndMsg);
+                                    break;
+                                }
+                            case Commands.Users.List:
+                                {
+                                    ShowUsersList(handler, CurUser, GetParameters(data_parse));
+                                    break;
+                                }
+                            case Commands.Users.ActiveUsersList:
+                                {
+                                    ShowActiveUsersList(handler, CurUser, GetParameters(data_parse));
+                                    break;
+                                }
+                            case Commands.Users.Add:
+                                {
+                                    AddUser(handler, CurUser, GetParameters(data_parse));
+                                    break;
+                                }
+                            case Commands.Users.Update:
+                                {
+                                    UpdateUser(handler, CurUser, GetParameters(data_parse));
+                                    break;
+                                }
+                            case Commands.Users.Remove:
+                                {
+                                    RemoveUser(handler, CurUser, GetParameters(data_parse));
+                                    break;
+                                }
+                            case Commands.Users.RMRF:
+                                {
+                                    RMRFUser(handler, CurUser, GetParameters(data_parse));
+                                    break;
+                                }
+                            case Commands.Molecules.Add:
+                                {
+                                    Molecule_Add(handler, CurUser, GetParameters(data_parse));
+                                    break;
+                                }
+                            case Commands.Molecules.Search:
+                                {
+                                    Molecule_Search(handler, CurUser, GetParameters(data_parse));
+                                    break;
+                                }
+                            default:
+                                {
+                                    DataBase.ExecuteQuery("UPDATE `queries` SET `comment` = '! Unknown command' " +
+                                        "WHERE `id` = " + LogID.ToString() + ";");
 
-                                SendMsg(handler, Commands.Answer.StartMsg);
-                                SendMsg(handler, "Error 1: Unknown command in line 0");
-                                SendMsg(handler, Commands.Answer.EndMsg);
-                                break;
-                            }
-                    }
+                                    SendMsg(handler, Commands.Answer.StartMsg);
+                                    SendMsg(handler, "Error 1: Unknown command in line 0");
+                                    SendMsg(handler, Commands.Answer.EndMsg);
+                                    break;
+                                }
+                        }
 
                     if (data.IndexOf("<TheEnd>") > -1)
                     {
@@ -782,10 +791,7 @@ VALUES ('" + ((IPEndPoint)handler.RemoteEndPoint).Address.ToString() + "', '" + 
                         break;
                     }
 
-                    handler.Shutdown(SocketShutdown.Both);
-                    handler.Close();
-
-                    GC.Collect();
+                    FinishConnection(handler);
                 }
             }
             catch (Exception ex)
@@ -796,6 +802,14 @@ VALUES ('" + ((IPEndPoint)handler.RemoteEndPoint).Address.ToString() + "', '" + 
             {
                 Console.ReadLine();
             }
+        }
+
+        private static void FinishConnection(Socket handler)
+        {
+            handler.Shutdown(SocketShutdown.Both);
+            handler.Close();
+
+            GC.Collect();
         }
 
         private static void Molecule_Search(Socket handler, User CurUser, string[] Params)

@@ -4,6 +4,7 @@ using System.Linq;
 using System.Net.Sockets;
 using System.Text;
 using ConsoleServer;
+using System.Data;
 
 namespace Commands
 {
@@ -116,11 +117,14 @@ namespace Commands
                 return;
             } 
 
-            switch (Command[1])
+            switch (Command[1].ToLower())
             {
                 case Help: SendHelp(handler); break;
                 case Add: AddLaboratory(handler, CurUser, DataBase, Params); break;
                 case Edit: UpdateLaboratory(handler, CurUser, DataBase, Params); break;
+                case List: ListShow(handler, CurUser, DataBase, Params); break;
+                case Names: NamesShow(handler, CurUser, DataBase, Params); break;
+                default: SimpleMsg(handler, "Unknown command"); break;
             }
         }
 
@@ -245,6 +249,112 @@ namespace Commands
             // Добавляем в базу
             DataBase.ExecuteQuery("UPDATE `laboratory` SET " + Addition + " WHERE `id`=" + ID + " LIMIT 1;");
             SimpleMsg(handler, "Laboratory updated successfully");
+        }
+
+        private static void ListShow(Socket handler, User CurUser, DB DataBase, string[] Params)
+        {
+            // Взять всё из журнала и...
+            string Query = @"SELECT `id`, `abbr`, `name` FROM `laboratory`";
+
+            // Инициация переменных, чтобы из if(){} нормально вышли
+            string ID = "";
+            string Abbr = "";
+            string L_Name = "";
+            string Limit = "100";
+
+            // Посмотрим все доп. параметры
+            for (int i = 0; i < Params.Count(); i++)
+            {
+                string[] Param = Params[i].ToLower().Split(' '); // Доп. параметр от значения отделяется пробелом
+
+                if (Param[0] == "id") ID = SimpleParam(Param);
+                if (Param[0] == "abbr") Abbr = SimpleParam(Param);
+                if (Param[0] == "name") L_Name = AllParam(Param);
+                if (Param[0] == "limit") Limit = SimpleParam(Param);
+                // Служебные
+                if (Param[0] == "help")     // Помощь
+                {
+                    SimpleMsg(handler, @"Command to show list of laboratories. You may enter filter. Possible filters:
+ - id [Number] - laboratory's ID
+ - name [Name] - laboratory's full name
+ - abb [ABB] - laboratory's abbriviation
+ - limit [Number] - Count of records to show. Default value = 100.");
+                    return;
+                }
+            }
+
+            // Счётчик условий.
+            int СountConditions = 0;
+            //Выберем по ID
+            if (ID != "")
+            {
+                Query += СountConditions == 0 
+                    ? " WHERE (`id` = " + ID + ")" 
+                    : " AND (`id` = " + ID + ")";
+                СountConditions++;
+            }
+
+            // Выберем имя
+            if (L_Name != "")
+            {
+                Query += СountConditions == 0 
+                    ? " WHERE (`name` LIKE '%" + L_Name + "%')" 
+                    : " AND (`name` LIKE '%" + L_Name + "%'";
+                СountConditions++;
+            }
+
+            // Выберем аббривиатуру
+            if (Abbr != "")
+            {
+                Query += СountConditions == 0
+                    ? " WHERE (`abbr` LIKE '%" + Abbr + "%')"
+                    : " AND (`abbr` LIKE '%" + Abbr + "%'";
+                СountConditions++;
+            }
+
+            // Добавим лимит
+            Query += " LIMIT " + Limit + ";";
+
+            DataTable Res = DataBase.Query(Query);
+
+            // И отошлём всё.
+            SocketServer.Program.SendMsg(handler, Answer.StartMsg);
+            SocketServer.Program.SendMsg(handler, "| ID\t | Abbr \t |Name");
+            SocketServer.Program.SendMsg(handler, "|--------|--------|-----------------------");
+
+            //Server Fail – quit date of restart
+            if (Res.Rows.Count == 0) SocketServer.Program.SendMsg(handler, "Results not found");
+
+            for (int i = 0; i < Res.Rows.Count; i++)
+            {
+                string msg = "| " + Res.Rows[i].ItemArray[0].ToString() + "\t | ";
+                msg += Res.Rows[i].ItemArray[1].ToString() + "\t | ";
+                msg += Res.Rows[i].ItemArray[2].ToString();
+                SocketServer.Program.SendMsg(handler, msg);
+            }
+            SocketServer.Program.SendMsg(handler, Answer.EndMsg);
+
+        }
+
+        private static void NamesShow(Socket handler, User CurUser, DB DataBase, string[] Params)
+        {
+            // Запросим список лабораторий
+            string Query = @"SELECT `id`, `name` FROM `laboratory`";
+            DataTable Res = DataBase.Query(Query);
+
+            // И отошлём их, разделяя ID и имя знаком '='
+            SocketServer.Program.SendMsg(handler, Answer.StartMsg);
+
+            // Server Fail – quit date of restart
+            if (Res.Rows.Count == 0) SimpleMsg(handler, "Results not found");
+
+            for (int i = 0; i < Res.Rows.Count; i++)
+            {
+                string msg = Res.Rows[i].ItemArray[0].ToString() + "=";
+                msg += Res.Rows[i].ItemArray[1].ToString();
+                SocketServer.Program.SendMsg(handler, msg);
+            }
+            SocketServer.Program.SendMsg(handler, Answer.EndMsg);
         }
     }
 }

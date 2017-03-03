@@ -582,10 +582,12 @@ VALUES ('" + ((IPEndPoint)handler.RemoteEndPoint).Address.ToString() + "', '" + 
                     // Обработка классом Commands.
 
                     string[] Command = data_parse[0].Split('.');
-                    if (Command[0] == Commands.Laboratories.Name)
+                    if (Command[0].ToLower() == Commands.Laboratories.Name)
                     {
                         Commands.Laboratories.Execute(handler, CurUser, DataBase, Command,
                             GetParameters(data_parse));
+                        FinishConnection(handler);
+                        continue;
                     }
 
 

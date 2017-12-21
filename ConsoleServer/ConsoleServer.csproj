@@ -54,6 +54,8 @@
   <ItemGroup>
     <Compile Include="AES_Data.cs" />
     <Compile Include="Commands.cs" />
+    <Compile Include="Commands.Laboratories.cs" />
+    <Compile Include="Commands.User.cs" />
     <Compile Include="DB.cs" />
     <Compile Include="Files.cs" />
     <Compile Include="Molecule_Transport.cs" />

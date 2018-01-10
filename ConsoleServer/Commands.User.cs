@@ -128,20 +128,13 @@ Parameters may be combined.");
             for (int i = 0; i < Res.Rows.Count; i++)
             {
                 string msg = "| " + Res.Rows[i].ItemArray[0].ToString() + "\t | ";
-                msg += Res.Rows[i].ItemArray[1].ToString() +
-                    new String(' ', 20 - Res.Rows[i].ItemArray[1].ToString().Length) + " | ";
-                msg += Res.Rows[i].ItemArray[2].ToString() +
-                    new String(' ', 20 - Res.Rows[i].ItemArray[2].ToString().Length) + " | ";
-                msg += Res.Rows[i].ItemArray[3].ToString() +
-                    new String(' ', 20 - Res.Rows[i].ItemArray[3].ToString().Length) + " | ";
-                msg += Res.Rows[i].ItemArray[7].ToString() +
-                    new String(' ', 15 - Res.Rows[i].ItemArray[7].ToString().Length) + " | ";
-                msg += Res.Rows[i].ItemArray[4].ToString() +
-                    new String(' ', 5 - Res.Rows[i].ItemArray[4].ToString().Length) + " | ";
-                msg += Res.Rows[i].ItemArray[5].ToString() +
-                    new String(' ', 10 - Res.Rows[i].ItemArray[5].ToString().Length) + " | ";
-                msg += Res.Rows[i].ItemArray[6].ToString() +
-                    new String(' ', 5 - Res.Rows[i].ItemArray[6].ToString().Length) + " | ";
+                msg += StringLength(Res.Rows[i].ItemArray[1].ToString(), 20) + " | ";
+                msg += StringLength(Res.Rows[i].ItemArray[2].ToString(), 20) + " | ";
+                msg += StringLength(Res.Rows[i].ItemArray[3].ToString(), 20) + " | ";
+                msg += StringLength(Res.Rows[i].ItemArray[7].ToString(), 15) + " | ";
+                msg += StringLength(Res.Rows[i].ItemArray[4].ToString(), 05) + " | ";
+                msg += StringLength(Res.Rows[i].ItemArray[5].ToString(), 10) + " | ";
+                msg += StringLength(Res.Rows[i].ItemArray[6].ToString(), 05) + " | ";
                 SendMsg(handler, msg);
             }
             SendMsg(handler, Commands.Answer.EndMsg);
@@ -156,25 +149,17 @@ Parameters may be combined.");
             SendMsg(handler, Answer.StartMsg);
             foreach (User U in SocketServer.Program.Active_Users)
             {
-                string msg = "| " + U.GetID().ToString() +
-                    new string(' ', 5 - U.GetID().ToString().Length) + " | ";
-                msg += U.GetSurname() +
-                    new string(' ', 20 - U.GetSurname().Length) + " | ";
-                msg += U.GetName() +
-                   new string(' ', 20 - U.GetName().Length) + " | ";
-                msg += U.GetFathersName() +
-                   new string(' ', 20 - U.GetFathersName().Length) + " | ";
-                msg += U.GetLogin() +
-                   new string(' ', 15 - U.GetLogin().Length) + " | ";
+                string msg = "| " + StringLength(U.GetID().ToString(), 05) + " | ";
+                msg += StringLength(U.GetSurname(), 20) + " | ";
+                msg += StringLength(U.GetName(), 20) + " | ";
+                msg += StringLength(U.GetFathersName(), 20) + " | ";
+                msg += StringLength(U.GetLogin(), 15) + " | ";
                 string Lab = DataBase.Query("SELECT `abbr` FROM `laboratory` WHERE `id` = " +
                     U.GetLaboratory().ToString() + " LIMIT 1;").Rows[0].ItemArray[0].ToString();
-                msg += Lab + new string(' ', 5 - Lab.Length) + " | ";
-                msg += U.GetJob() +
-                   new string(' ', 10 - U.GetJob().Length) + " | ";
-                msg += U.GetPermissionsInt().ToString() +
-                   new string(' ', 5 - U.GetPermissionsInt().ToString().Length) + " | ";
-                msg += U.GetUserID().ToString() +
-                   new string(' ', 20 - U.GetUserID().Length) + " | ";
+                msg += StringLength(Lab, 5) + " | ";
+                msg += StringLength(U.GetJob(), 10) + " | ";
+                msg += StringLength(U.GetPermissionsInt().ToString(), 5) + " | ";
+                msg += StringLength(U.GetUserID().ToString(), 20) + " | ";
 
                 SendMsg(handler, msg);
             }

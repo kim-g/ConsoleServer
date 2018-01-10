@@ -43,6 +43,18 @@ namespace Commands
         {
             SocketServer.Program.SendMsg(handler, Msg);
         }
+
+        /// <summary>
+        /// Выдаёт строку с пробелами в конце до нужного значения. 
+        /// Если строка превышает объём, то она НЕ обрезается.
+        /// </summary> 
+        /// <param name="Text">Строка для обработки</param>
+        /// <param name="Length">Минимальная длина выходного текста</param>
+        public static string StringLength(string Text, int Length)
+        {
+            if (Text.Length >= Length) return Text;
+            return Text + new String(' ', Length - Text.Length);
+        }
     }
 
     class Global

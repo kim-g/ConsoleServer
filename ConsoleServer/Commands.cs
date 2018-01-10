@@ -106,13 +106,7 @@ namespace Commands
 
     
 
-    class Molecules
-    {
-        // Команды по молекулам
-        public const string Help = "molecules";             // справка по командам molecules
-        public const string Add = "molecules.add";          // Добавление молекулы
-        public const string Search = "molecule.search";     // Поиск по молекулам
-    }
+    
 
     
 }

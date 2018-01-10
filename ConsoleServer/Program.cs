@@ -30,7 +30,7 @@ namespace SocketServer
         static DB DataBase;
 
         // Ключ и вектор для шифрования
-        static AES_Data CommonAES;
+        public static AES_Data CommonAES;
 
         // Список активных пользователей
         public static List<User> Active_Users = new List<User>();
@@ -96,6 +96,7 @@ namespace SocketServer
                 dt.Rows[i].ItemArray[j] as byte[])).Trim(new char[] { "\n"[0], ' ' });
         }
 
+        // УСТАРЕЛО!!!
         // Поиск по подструктуре из БД с расшифровкой
         static List<string> Get_Mol(User CurUser, string Sub_Mol = "", string Request = "Permission", int Status = 0)
         {
@@ -135,6 +136,7 @@ namespace SocketServer
             return Result;
         }
 
+        // УСТАРЕЛО!!!
         private static Molecule_Transport DataRow_To_Molecule_Transport(DataTable dt, int i)
         {
             /*
@@ -220,6 +222,7 @@ namespace SocketServer
             return Text != "" ? Text : "<@None@>";
         }
 
+        // УСТАРЕЛО!!!
         static bool CheckMol(string Mol, string DB_Mol)
         {
             // Создаём объекты OpenBabel
@@ -241,6 +244,7 @@ namespace SocketServer
             if (Vec.Count > 0) { return true; } else { return false; }; //Возвращаем результат
         }
 
+        // УСТАРЕЛО!!!
         static void Search_Molecules(Socket handler, User CurUser, string Mol = "", string Request = "Permission",
             int Status = 0)
         {
@@ -596,6 +600,13 @@ VALUES ('" + ((IPEndPoint)handler.RemoteEndPoint).Address.ToString() + "', '" + 
                         case Commands.Users.Name:
                             {
                                 Commands.Users.Execute(handler, CurUser, DataBase, Command,
+                                    GetParameters(data_parse));
+                                FinishConnection(handler);
+                                continue;
+                            }
+                        case Commands.Molecules.Name:
+                            {
+                                Commands.Molecules.Execute(handler, CurUser, DataBase, Command,
                                     GetParameters(data_parse));
                                 FinishConnection(handler);
                                 continue;

@@ -55,6 +55,7 @@
     <Compile Include="AES_Data.cs" />
     <Compile Include="Commands.cs" />
     <Compile Include="Commands.Laboratories.cs" />
+    <Compile Include="Commands.Molecules.cs" />
     <Compile Include="Commands.User.cs" />
     <Compile Include="DB.cs" />
     <Compile Include="Files.cs" />

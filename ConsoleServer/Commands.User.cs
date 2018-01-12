@@ -56,7 +56,7 @@ namespace Commands
         static void ShowUsersList(Socket handler, User CurUser, DB DataBase, string[] Params)
         {
             // Если не админ, то ничего не покажем!
-            if (!SocketServer.Program.IsAdmin(handler, CurUser)) return;
+            if (!ConsoleServer.Program.IsAdmin(handler, CurUser)) return;
 
             // Взять всё из журнала и...
             string Query = @"SELECT `persons`.`id`, `Surname`, `persons`.`name`, `fathers_name`, `laboratory`.`abbr`, `job`, `Permissions`, `login`  
@@ -144,10 +144,10 @@ Parameters may be combined.");
         static void ShowActiveUsersList(Socket handler, User CurUser, DB DataBase, string[] Params)
         {
             // Если не админ, то ничего не покажем!
-            if (!SocketServer.Program.IsAdmin(handler, CurUser)) return;
+            if (!ConsoleServer.Program.IsAdmin(handler, CurUser)) return;
 
             SendMsg(handler, Answer.StartMsg);
-            foreach (User U in SocketServer.Program.Active_Users)
+            foreach (User U in ConsoleServer.Program.Active_Users)
             {
                 string msg = "| " + StringLength(U.GetID().ToString(), 05) + " | ";
                 msg += StringLength(U.GetSurname(), 20) + " | ";

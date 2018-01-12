@@ -5,7 +5,6 @@ using System.Text;
 using System.Security.Cryptography;
 using MySql.Data.MySqlClient;
 using System.Data;
-using SocketServer;
 
 namespace ConsoleServer
 {

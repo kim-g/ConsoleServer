@@ -41,7 +41,7 @@ namespace Commands
         // Вызывает внешниюю команду посылки сообщения
         public static void SendMsg(Socket handler, string Msg)
         {
-            SocketServer.Program.SendMsg(handler, Msg);
+            ConsoleServer.Program.SendMsg(handler, Msg);
         }
 
         /// <summary>

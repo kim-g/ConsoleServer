@@ -224,21 +224,21 @@ namespace Commands
             DataTable Res = DataBase.Query(Query);
 
             // И отошлём всё.
-            SocketServer.Program.SendMsg(handler, Answer.StartMsg);
-            SocketServer.Program.SendMsg(handler, "| ID\t | Abbr \t |Name");
-            SocketServer.Program.SendMsg(handler, "|--------|--------|-----------------------");
+            ConsoleServer.Program.SendMsg(handler, Answer.StartMsg);
+            ConsoleServer.Program.SendMsg(handler, "| ID\t | Abbr \t |Name");
+            ConsoleServer.Program.SendMsg(handler, "|--------|--------|-----------------------");
 
             //Server Fail – quit date of restart
-            if (Res.Rows.Count == 0) SocketServer.Program.SendMsg(handler, "Results not found");
+            if (Res.Rows.Count == 0) ConsoleServer.Program.SendMsg(handler, "Results not found");
 
             for (int i = 0; i < Res.Rows.Count; i++)
             {
                 string msg = "| " + Res.Rows[i].ItemArray[0].ToString() + "\t | ";
                 msg += Res.Rows[i].ItemArray[1].ToString() + "\t | ";
                 msg += Res.Rows[i].ItemArray[2].ToString();
-                SocketServer.Program.SendMsg(handler, msg);
+                ConsoleServer.Program.SendMsg(handler, msg);
             }
-            SocketServer.Program.SendMsg(handler, Answer.EndMsg);
+            ConsoleServer.Program.SendMsg(handler, Answer.EndMsg);
 
         }
 
@@ -249,7 +249,7 @@ namespace Commands
             DataTable Res = DataBase.Query(Query);
 
             // И отошлём их, разделяя ID и имя знаком '='
-            SocketServer.Program.SendMsg(handler, Answer.StartMsg);
+            ConsoleServer.Program.SendMsg(handler, Answer.StartMsg);
 
             // Server Fail – quit date of restart
             if (Res.Rows.Count == 0) SimpleMsg(handler, "Results not found");
@@ -258,9 +258,9 @@ namespace Commands
             {
                 string msg = Res.Rows[i].ItemArray[0].ToString() + "=";
                 msg += Res.Rows[i].ItemArray[1].ToString();
-                SocketServer.Program.SendMsg(handler, msg);
+                ConsoleServer.Program.SendMsg(handler, msg);
             }
-            SocketServer.Program.SendMsg(handler, Answer.EndMsg);
+            ConsoleServer.Program.SendMsg(handler, Answer.EndMsg);
         }
     }
 }

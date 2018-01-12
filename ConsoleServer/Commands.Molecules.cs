@@ -29,14 +29,15 @@ namespace Commands
             {
                 case Help: SendHelp(handler); break;
                 //case Add: AddMolecule(handler, CurUser, DataBase, Params); break;
-                case Search: SearchMoleculesBySMILES(handler, CurUser, DataBase, Params); break;
+                case Search: /*Program.Search_Molecules(handler, CurUser, Params[0]);*/
+                    SearchMoleculesBySMILES(handler, CurUser, DataBase, Params); break;
                 default: SimpleMsg(handler, "Unknown command"); break;
             }
         }
 
         private static void SendHelp(Socket handler)
         {
-            SimpleMsg(handler, @"List of molecules. The main interface to work eith molecules. Possible comands:
+            SimpleMsg(handler, @"List of molecules. The main interface to work with molecules. Possible comands:
  - molecules.add - Adds new molecule
  - molecules.search - changes user information");
         }
@@ -44,19 +45,22 @@ namespace Commands
         private static void SearchMoleculesBySMILES(Socket handler, User CurUser, DB DataBase, string[] Params)
         {
             string Structure = "";
+            string UserID = "";
             foreach (string Param in Params)
             {
-                string[] Parameter = Param.ToLower().Split(' ');
-                switch (Parameter[0])
+                string[] Parameter = Param.Split(' ');
+                switch (Parameter[0].ToLower())
                 {
                     case "structure":
                         Structure = AllParam(Parameter); break;
+                    case "user":
+                        UserID = SimpleParam(Parameter); break;
                     default: break;
                 }
             }
             
             // Запрашиваем поиск по БД
-            List<string> Result = Get_Mol(DataBase, CurUser, Structure, "Permission", 0);
+            List<string> Result = Get_Mol(DataBase, CurUser, Structure, "Permission", 0, UserID);
 
             // Отправляем ответ клиенту\
             SendMsg(handler, Answer.StartMsg);
@@ -70,7 +74,7 @@ namespace Commands
 
         // Поиск по подструктуре из БД с расшифровкой
         static List<string> Get_Mol(DB DataBase, User CurUser, string Sub_Mol = "", 
-            string Request = "Permission", int Status = 0)
+            string Request = "Permission", int Status = 0, string UserID=null)
         {
             //Создаём новые объекты
             List<string> Result = new List<string>(); //Список вывода
@@ -81,6 +85,7 @@ namespace Commands
             queryString += "\nFROM `molecules` \n";
             queryString += "WHERE (" + CurUser.GetPermissionsOrReqest(Request) + ")";
             if (Status > 0) queryString += " AND (`status` = " + Status.ToString() + ")"; // Добавляем статус в запрос
+            if (UserID != "") queryString += " AND (`person` = " + UserID + ")"; // Ищем для конкретного пользователя
 
             DataTable dt = DataBase.Query(queryString);
 
@@ -97,7 +102,7 @@ namespace Commands
                 for (int i = 0; i < dt.Rows.Count; i++)
                 {
                     //Расшифровка
-                    string Structure = SocketServer.Program.CommonAES.DecryptStringFromBytes(dt.Rows[i].ItemArray[4] as byte[]);
+                    string Structure = ConsoleServer.Program.CommonAES.DecryptStringFromBytes(dt.Rows[i].ItemArray[4] as byte[]);
 
                     if (CheckMol(Sub_Mol, Structure))
                         Result.Add(DataRow_To_Molecule_Transport(DataBase, dt, i).ToXML());
@@ -114,12 +119,14 @@ namespace Commands
             // Создаём объекты OpenBabel
             OBSmartsPattern SP = new OBSmartsPattern();
             OBConversion obconv = new OBConversion();
+            obconv.SetInFormat("smi");
             OBMol mol = new OBMol();
-            obconv.SetInFormat("smi");  //У нас всё в формате SMILES
             obconv.ReadString(mol, Mol);
-            if (!mol.DeleteHydrogens()) { Console.WriteLine("DeleteHidrogens() failed!"); };  //Убираем все водороды
             obconv.SetOutFormat("smi");
 
+            string Temp = obconv.WriteString(mol);
+            if (!mol.DeleteHydrogens()) { Console.WriteLine("DeleteHidrogens() failed!"); };  //Убираем все водороды
+            
             string SubMol = System.Text.RegularExpressions.Regex.Replace(obconv.WriteString(mol), "[Hh ]", ""); //Убираем все водороды
             SP.Init(SubMol);  //Задаём структуру поиска в SMARTS
 
@@ -251,7 +258,7 @@ namespace Commands
         // NotNull без пробелов элемент из БД
         static string FromBaseDecrypt(DataTable dt, int i, int j)
         {
-            return NotNull(SocketServer.Program.CommonAES.DecryptStringFromBytes(
+            return NotNull(ConsoleServer.Program.CommonAES.DecryptStringFromBytes(
                 dt.Rows[i].ItemArray[j] as byte[])).Trim(new char[] { "\n"[0], ' ' });
         }
 

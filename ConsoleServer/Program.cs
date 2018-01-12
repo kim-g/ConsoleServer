@@ -13,9 +13,9 @@ using System.Security.Cryptography;
 using System.Xml.Serialization;
 using ConsoleServer;
 
-namespace SocketServer
+namespace ConsoleServer
 {
-    class Program
+    public class Program
     {
         // Отладочные команды. Для релиза поставить FALSE
         const bool DEBUG = true;
@@ -98,7 +98,7 @@ namespace SocketServer
 
         // УСТАРЕЛО!!!
         // Поиск по подструктуре из БД с расшифровкой
-        static List<string> Get_Mol(User CurUser, string Sub_Mol = "", string Request = "Permission", int Status = 0)
+        public static List<string> Get_Mol(User CurUser, string Sub_Mol = "", string Request = "Permission", int Status = 0)
         {
             //Создаём новые объекты
             List<string> Result = new List<string>(); //Список вывода
@@ -223,7 +223,7 @@ namespace SocketServer
         }
 
         // УСТАРЕЛО!!!
-        static bool CheckMol(string Mol, string DB_Mol)
+        public static bool CheckMol(string Mol, string DB_Mol)
         {
             // Создаём объекты OpenBabel
             OBSmartsPattern SP = new OBSmartsPattern();
@@ -245,7 +245,7 @@ namespace SocketServer
         }
 
         // УСТАРЕЛО!!!
-        static void Search_Molecules(Socket handler, User CurUser, string Mol = "", string Request = "Permission",
+        public static void Search_Molecules(Socket handler, User CurUser, string Mol = "", string Request = "Permission",
             int Status = 0)
         {
             // Запрашиваем поиск по БД

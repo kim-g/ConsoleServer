@@ -53,6 +53,7 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="AES_Data.cs" />
+    <Compile Include="Commands.Account.cs" />
     <Compile Include="Commands.cs" />
     <Compile Include="Commands.Laboratories.cs" />
     <Compile Include="Commands.Molecules.cs" />

@@ -543,7 +543,7 @@ VALUES (" + FileID + ", " + MoleculeID + ")");
                     // Ищем пользователя по его логину и защитной записи.
                     // Если дана команда входа в систему, то поиск не производим.
                     User CurUser = null;
-                    if (data_parse[0].Trim() != Commands.Global.Login)
+                    if (data_parse[0].Trim() != Commands.Account.LoginAll)
                     {
                         CurUser = GetCurUser(data_parse[1], data_parse[2]);
                         if (CurUser == null)
@@ -566,13 +566,14 @@ VALUES (" + FileID + ", " + MoleculeID + ")");
                     for (int i = 3; i < data_parse.Count(); i++)
                     {
                         if (i > 3) Params += "\n";
-                        if ((data_parse[0].Trim() == Commands.Global.Login) && (i == 4))
-                            Params += "*****";
+                        if ((data_parse[0].Trim() == Commands.Account.LoginAll) && 
+                            (data_parse[i].StartsWith("password ")))
+                                Params += "*****";
                         else Params += data_parse[i];
                     }
 
                     // И добавляем в лог
-                    string LogQuery = data_parse[0].Trim() != Commands.Global.Login
+                    string LogQuery = data_parse[0].Trim() != Commands.Account.LoginAll
                         ? @"INSERT INTO `queries` (`user`, `session`,`ip`,`command`,`parameters`) 
 VALUES (" + CurUser.GetID().ToString() + ", " + CurUser.GetSessionID().ToString() +
 ", '" + ((IPEndPoint)handler.RemoteEndPoint).Address.ToString() + "', '" + data_parse[0] +
@@ -608,6 +609,14 @@ VALUES ('" + ((IPEndPoint)handler.RemoteEndPoint).Address.ToString() + "', '" + 
                             {
                                 Commands.Molecules.Execute(handler, CurUser, DataBase, Command,
                                     GetParameters(data_parse));
+                                FinishConnection(handler);
+                                continue;
+                            }
+
+                        case Commands.Account.Name:
+                            {
+                                Commands.Account.Execute(handler, CurUser, Active_Users, DataBase, Command,
+                                    GetParameters(data_parse), LogID);
                                 FinishConnection(handler);
                                 continue;
                             }
@@ -793,11 +802,13 @@ VALUES ('" + ((IPEndPoint)handler.RemoteEndPoint).Address.ToString() + "', '" + 
             GC.Collect();
         }
 
+        // УСТАРЕЛО!!!
         private static void Molecule_Search(Socket handler, User CurUser, string[] Params)
         {
             throw new NotImplementedException();
         }
 
+        // УСТАРЕЛО!!!
         private static void Molecule_Add(Socket handler, User CurUser, string[] Params)
         {
             // Начальная инициация переменных, чтобы из IF(){} вышли

@@ -1,4 +1,5 @@
 ﻿using ConsoleServer;
+using MySql.Data.MySqlClient;
 using OpenBabel;
 using System;
 using System.Collections.Generic;
@@ -28,11 +29,86 @@ namespace Commands
             switch (Command[1].ToLower())
             {
                 case Help: SendHelp(handler); break;
-                //case Add: AddMolecule(handler, CurUser, DataBase, Params); break;
-                case Search: /*Program.Search_Molecules(handler, CurUser, Params[0]);*/
-                    SearchMoleculesBySMILES(handler, CurUser, DataBase, Params); break;
+                case Add: AddMolecule(handler, CurUser, DataBase, Params); break;
+                case Search: SearchMoleculesBySMILES(handler, CurUser, DataBase, Params); break;
                 default: SimpleMsg(handler, "Unknown command"); break;
             }
+        }
+
+        private static void AddMolecule(Socket handler, User CurUser, DB DataBase, string[] Params)
+        {
+            // Начальная инициация переменных, чтобы из IF(){} вышли
+            string Subst = "";
+            string Lab = "";
+            string Person = "";
+            string Structure = "";
+            string PhysState = "";
+            string Melt = "";
+            string Conditions = "";
+            string Properties = "";
+            string Mass = "";
+            string Solution = "";
+
+            // Ищем данные
+            foreach (string Line in Params)
+            {
+                string[] Param = Line.Split(' ');
+                switch (Param[0].ToLower())
+                {
+                    case "code": Subst = SimpleParam(Param); break;
+                    case "laboratory": Lab = SimpleParam(Param); break;
+                    case "person": Person = SimpleParam(Param); break;
+                    case "structure": Structure = SimpleParam(Param); break;
+                    case "phys_state": PhysState = SimpleParam(Param); break;
+                    case "melting_point": Melt = SimpleParam(Param); break;
+                    case "conditions": Conditions = SimpleParam(Param); break;
+                    case "properties": Properties = SimpleParam(Param); break;
+                    case "mass": Mass = SimpleParam(Param); break;
+                    case "solution": Solution = SimpleParam(Param); break;
+                    case "help": SimpleMsg(handler, @"Command to add new molecule. Please, enter all information about the this. Parameters must include:
+ - code [Name] - Code of the substance.
+ - laboratory [Code] - ID of owner's laboratory.
+ - person [Code] - ID of owner.
+ - structure [SMILES] - molecular structure in SMILES format.
+ - phys_state [Phrase] - physical state (liquid, gas, solid...).
+ - melting_point [Temperature] - Temperature of melting point.
+ - conditions [Phrase] - storage conditions. 
+ - properties [Phrase] - other properties.
+ - mass [grammes] - mass of surrendered sample.
+ - solution [Phrase] - best solutions."); break;
+                }
+            }
+
+            // Проверяем, все ли нужные данные есть
+            if (Subst == "") { SimpleMsg(handler, "Error: No code entered"); return; }
+            if (Lab == "") { SimpleMsg(handler, "Error: No laboratory entered"); return; }
+            if (Person == "") { SimpleMsg(handler, "Error: No person entered"); return; }
+            if (Structure == "") { SimpleMsg(handler, "Error: No structure entered"); return; }
+            if (PhysState == "") { SimpleMsg(handler, "Error: No physical state entered"); return; }
+            if (Mass == "") { SimpleMsg(handler, "Error: No mass entered"); return; }
+            if (Solution == "") { SimpleMsg(handler, "Error: No solution entered"); return; }
+
+            // Добавление и шифровка
+            string queryString = @"INSERT INTO `molecules` 
+(`name`, `laboratory`, `person`, `b_structure`, `state`, `melting_point`, `conditions`, `other_properties`, `mass`, `solution`)
+VALUES (@Name, @Laboratory, @Person, @Structure, @State, @MeltingPoint, @Conditions, @OtherProperties, @Mass, @Solution);";
+
+            MySqlCommand com = DataBase.MakeCommandObject(queryString);
+            com.Parameters.AddWithValue("@Name", Subst);
+            com.Parameters.AddWithValue("@Laboratory", Lab);
+            com.Parameters.AddWithValue("@Person", Person);
+            com.Parameters.AddWithValue("@Structure", Program.CommonAES.EncryptStringToBytes(Structure));
+            com.Parameters.AddWithValue("@State", Program.CommonAES.EncryptStringToBytes(PhysState));
+            com.Parameters.AddWithValue("@MeltingPoint", Program.CommonAES.EncryptStringToBytes(Melt));
+            com.Parameters.AddWithValue("@Conditions", Program.CommonAES.EncryptStringToBytes(Conditions));
+            com.Parameters.AddWithValue("@OtherProperties", Program.CommonAES.EncryptStringToBytes(Properties));
+            com.Parameters.AddWithValue("@Mass", Program.CommonAES.EncryptStringToBytes(Mass));
+            com.Parameters.AddWithValue("@Solution", Program.CommonAES.EncryptStringToBytes(Solution));
+
+            com.ExecuteNonQuery();
+
+            //И отпишемся.
+            SimpleMsg(handler, "Add_Molecule: done");
         }
 
         private static void SendHelp(Socket handler)
@@ -46,6 +122,8 @@ namespace Commands
         {
             string Structure = "";
             string UserID = "";
+            string SearchAria = "Permission";
+
             foreach (string Param in Params)
             {
                 string[] Parameter = Param.Split(' ');
@@ -55,12 +133,14 @@ namespace Commands
                         Structure = AllParam(Parameter); break;
                     case "user":
                         UserID = SimpleParam(Parameter); break;
+                    case "my":
+                        SearchAria = "My"; break;
                     default: break;
                 }
             }
             
             // Запрашиваем поиск по БД
-            List<string> Result = Get_Mol(DataBase, CurUser, Structure, "Permission", 0, UserID);
+            List<string> Result = Get_Mol(DataBase, CurUser, Structure, SearchAria, 0, UserID);
 
             // Отправляем ответ клиенту\
             SendMsg(handler, Answer.StartMsg);

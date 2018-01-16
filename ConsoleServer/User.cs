@@ -135,6 +135,22 @@ namespace ConsoleServer
             return Rights == 11;
         }
 
+        public string Status()
+        {
+            switch (Rights)
+            {
+                case 0: return "user,user,null";
+                case 1: return "lab,user,null";
+                case 2: return "lab,lab,null";
+                case 3: return "ios,user,null";
+                case 4: return "ios,lab,null";
+                case 5: return "ios,ios,null";
+                case 10: return "ios,ios,admin";
+                case 11: return "ios,ios,manager";
+                default: return "user,user,null";
+            }
+        }
+
         public static string GetPasswordHash(string Password)
         {
             return getMd5Hash(Password + Salt);
@@ -383,6 +399,26 @@ namespace ConsoleServer
         {
             return DataBase.ExecuteQuery("DELETE FROM `persons` WHERE `id`=" + ID.ToString() + 
                 " LIMIT 1") > 0;
+        }
+
+        public string GetUserListRermissions()
+        {
+            switch (Rights)
+            {
+                case 0:
+                    return "`id` = " + ID.ToString();
+                case 1:
+                case 2:
+                    return "`persons`.`laboratory` = " + Laboratory.ToString();
+                case 3:
+                case 4:
+                case 5:
+                case 10:
+                case 11:
+                    return "TRUE";
+                default:
+                    return "`person` = " + ID.ToString();
+            }
         }
 
         const string Salt =   @"ДжОнатан Билл, 

@@ -9,9 +9,6 @@ using System.IO;
 using System.Net;
 using System.Net.Sockets;
 using MySql.Data.MySqlClient;
-using System.Security.Cryptography;
-using System.Xml.Serialization;
-using ConsoleServer;
 
 namespace ConsoleServer
 {
@@ -54,7 +51,7 @@ namespace ConsoleServer
 
 
         // Поиск элементов в БД
-        static List<string> GetRows(string Query)
+        public static List<string> GetRows(string Query)
         {
             List<string> Result = new List<string>();
 
@@ -276,6 +273,7 @@ namespace ConsoleServer
             SendMsg(handler, Commands.Answer.EndMsg);
         }
 
+        // УСТАРЕЛО!!!
         // Кодирует структуры заданным ключом. ADMIN ONLY
         static void EncryptAll(Socket handler, User CurUser)
         {
@@ -345,6 +343,7 @@ VALUES (@Name, @Laboratory, @Person, @Structure, @State, @MeltingPoint, @Conditi
             SendMsg(handler, Commands.Answer.EndMsg);
         }
 
+        // УСТАРЕЛО!!!
         // Проверка имени пользователя и пароля
         static void LoginMsg(Socket handler, string _User, string _Password, int LogID)
         {
@@ -384,6 +383,7 @@ VALUES (@Name, @Laboratory, @Person, @Structure, @State, @MeltingPoint, @Conditi
             SendMsg(handler, Commands.Answer.EndMsg);
         }
 
+        // УСТАРЕЛО!!!
         static void SendStatusList(Socket handler)
         {
             List<string> Res = GetRows("SELECT * FROM `status`");
@@ -469,6 +469,7 @@ VALUES (" + FileID + ", " + MoleculeID + ")");
             SendMsg(handler, Commands.Answer.EndMsg);
         }
 
+        // УСТАРЕЛО!!!
         // Выход пользователя
         static void User_Quit(Socket handler, User CurUser)
         {
@@ -620,6 +621,13 @@ VALUES ('" + ((IPEndPoint)handler.RemoteEndPoint).Address.ToString() + "', '" + 
                                 FinishConnection(handler);
                                 continue;
                             }
+                        case Commands.Database.Name:
+                            {
+                                Commands.Database.Execute(handler, CurUser, DataBase, Command,
+                                    GetParameters(data_parse));
+                                FinishConnection(handler);
+                                continue;
+                            }
                     };
 
                         // Обрабатываем запрос в оставшихся случаях.
@@ -714,7 +722,9 @@ VALUES ('" + ((IPEndPoint)handler.RemoteEndPoint).Address.ToString() + "', '" + 
  - log - direct access to server's logs;
  - database - direct access to server's database;
  - users - direct access to list of users
- - molecules - direct access to molecules list");
+ - molecules - direct access to molecules list;
+ - account - commands to log in and quit
+ - laboratories - direct access to list of laboratories");
                                     SendMsg(handler, Commands.Answer.EndMsg);
                                     break;
                                 }
@@ -736,14 +746,6 @@ VALUES ('" + ((IPEndPoint)handler.RemoteEndPoint).Address.ToString() + "', '" + 
                                     SendMsg(handler, @"System logs. Shows informations aboute program usage. Possible comands:
  - log.sessions - shows sessions history
  - log.queries - shows query history.");
-                                    SendMsg(handler, Commands.Answer.EndMsg);
-                                    break;
-                                }
-                            case Commands.Database.Help:
-                                {
-                                    SendMsg(handler, Commands.Answer.StartMsg);
-                                    SendMsg(handler, @"System database. Makes the direct access to DB commands. Possible comands:
- - database.show_last_id - shows ID key of the last inserted row.");
                                     SendMsg(handler, Commands.Answer.EndMsg);
                                     break;
                                 }
@@ -982,6 +984,7 @@ VALUES (@Name, @Laboratory, @Person, @Structure, @State, @MeltingPoint, @Conditi
             SimpleMsg(handler, "OK");
         }
 
+        // УСТАРЕЛО!!!
         public static int GetLastID(DB DataBase)
         {
             DataTable LR = DataBase.Query("SELECT LAST_INSERT_ID()");

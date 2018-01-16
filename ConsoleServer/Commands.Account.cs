@@ -93,9 +93,10 @@ namespace Commands
             SendMsg(handler, Answer.LoginOK);
             SendMsg(handler, NewUser.GetUserID());
             SendMsg(handler, NewUser.GetID().ToString());
-            SendMsg(handler, NewUser.GetFullName());
-            if (NewUser.IsAdmin()) { SendMsg(handler, Answer.Answer_Admin); };
-            if (NewUser.IsManager()) { SendMsg(handler, Answer.Answer_Manager); };
+            SendMsg(handler, NewUser.GetName());
+            SendMsg(handler, NewUser.GetFathersName());
+            SendMsg(handler, NewUser.GetSurname());
+            SendMsg(handler, NewUser.Status());
             SendMsg(handler, Answer.EndMsg);
         }
 

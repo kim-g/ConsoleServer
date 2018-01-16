@@ -90,11 +90,6 @@ namespace Commands
         public const string Answer_Manager = "ManagerOK";
     }
 
-    class Database
-    {
-        public const string Help = "database";    // Справка по использованию БД
-        public const string LastID = "database.show_last_id";    // Показать последний использованный ID
-    }
 
     class Log
     {

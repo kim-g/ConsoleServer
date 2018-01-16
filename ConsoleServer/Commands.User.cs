@@ -55,9 +55,6 @@ namespace Commands
         //Показать список пользователей
         static void ShowUsersList(Socket handler, User CurUser, DB DataBase, string[] Params)
         {
-            // Если не админ, то ничего не покажем!
-            if (!ConsoleServer.Program.IsAdmin(handler, CurUser)) return;
-
             // Взять всё из журнала и...
             string Query = @"SELECT `persons`.`id`, `Surname`, `persons`.`name`, `fathers_name`, `laboratory`.`abbr`, `job`, `Permissions`, `login`  
 FROM `persons` 
@@ -111,6 +108,9 @@ Parameters may be combined.");
             //Выберем по логину
             if (Login != "") Query += " AND (`login` LIKE '%" + Login + "%')";
 
+            // Покажем только тех, кого можно конкретному пользователю
+            Query += " AND (" + CurUser.GetUserListRermissions() + ")";
+
 
             // Добавим обратную сортировку и лимит
             Query += "\nORDER BY `Surname`\nLIMIT " + Limit + ";";
@@ -137,7 +137,7 @@ Parameters may be combined.");
                 msg += StringLength(Res.Rows[i].ItemArray[6].ToString(), 05) + " | ";
                 SendMsg(handler, msg);
             }
-            SendMsg(handler, Commands.Answer.EndMsg);
+            SendMsg(handler, Answer.EndMsg);
         }
 
         // Показать список активных пользователей

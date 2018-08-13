@@ -7,6 +7,7 @@ using System.Data;
 using System.Linq;
 using System.Net.Sockets;
 using System.Text;
+using Extentions;
 
 namespace Commands
 {
@@ -35,6 +36,13 @@ namespace Commands
             }
         }
 
+        /// <summary>
+        /// Добавляет молекулу в базу данных
+        /// </summary>
+        /// <param name="handler"></param>
+        /// <param name="CurUser"></param>
+        /// <param name="DataBase"></param>
+        /// <param name="Params"></param>
         private static void AddMolecule(Socket handler, User CurUser, DB DataBase, string[] Params)
         {
             // Начальная инициация переменных, чтобы из IF(){} вышли
@@ -111,6 +119,10 @@ VALUES (@Name, @Laboratory, @Person, @Structure, @State, @MeltingPoint, @Conditi
             SimpleMsg(handler, "Add_Molecule: done");
         }
 
+        /// <summary>
+        /// Показывает справку о команде
+        /// </summary>
+        /// <param name="handler"></param>
         private static void SendHelp(Socket handler)
         {
             SimpleMsg(handler, @"List of molecules. The main interface to work with molecules. Possible comands:
@@ -118,11 +130,19 @@ VALUES (@Name, @Laboratory, @Person, @Structure, @State, @MeltingPoint, @Conditi
  - molecules.search - changes user information");
         }
 
+        /// <summary>
+        /// Поиск молекулы по SMILES
+        /// </summary>
+        /// <param name="handler"></param>
+        /// <param name="CurUser"></param>
+        /// <param name="DataBase"></param>
+        /// <param name="Params"></param>
         private static void SearchMoleculesBySMILES(Socket handler, User CurUser, DB DataBase, string[] Params)
         {
             string Structure = "";
             string UserID = "";
             string SearchAria = "Permission";
+            string Status = "0";
 
             foreach (string Param in Params)
             {
@@ -135,14 +155,18 @@ VALUES (@Name, @Laboratory, @Person, @Structure, @State, @MeltingPoint, @Conditi
                         UserID = SimpleParam(Parameter); break;
                     case "my":
                         SearchAria = "My"; break;
+                    case "status":
+                        Status = SimpleParam(Parameter); break;
+                    case "new":
+                        Status = "1"; break;
                     default: break;
                 }
             }
             
             // Запрашиваем поиск по БД
-            List<string> Result = Get_Mol(DataBase, CurUser, Structure, SearchAria, 0, UserID);
+            List<string> Result = Get_Mol(DataBase, CurUser, Structure, SearchAria, Status.ToInt(), UserID);
 
-            // Отправляем ответ клиенту\
+            // Отправляем ответ клиенту
             SendMsg(handler, Answer.StartMsg);
             for (int i = 0; i < Result.Count(); i++)
             {
@@ -152,7 +176,16 @@ VALUES (@Name, @Laboratory, @Person, @Structure, @State, @MeltingPoint, @Conditi
         }
 
 
-        // Поиск по подструктуре из БД с расшифровкой
+        /// <summary>
+        /// Поиск по подструктуре из БД с расшифровкой
+        /// </summary>
+        /// <param name="DataBase"></param>
+        /// <param name="CurUser"></param>
+        /// <param name="Sub_Mol"></param>
+        /// <param name="Request"></param>
+        /// <param name="Status"></param>
+        /// <param name="UserID"></param>
+        /// <returns></returns>
         static List<string> Get_Mol(DB DataBase, User CurUser, string Sub_Mol = "", 
             string Request = "Permission", int Status = 0, string UserID=null)
         {
@@ -182,7 +215,7 @@ VALUES (@Name, @Laboratory, @Person, @Structure, @State, @MeltingPoint, @Conditi
                 for (int i = 0; i < dt.Rows.Count; i++)
                 {
                     //Расшифровка
-                    string Structure = ConsoleServer.Program.CommonAES.DecryptStringFromBytes(dt.Rows[i].ItemArray[4] as byte[]);
+                    string Structure = Program.CommonAES.DecryptStringFromBytes(dt.Rows[i].ItemArray[4] as byte[]);
 
                     if (CheckMol(Sub_Mol, Structure))
                         Result.Add(DataRow_To_Molecule_Transport(DataBase, dt, i).ToXML());
@@ -193,7 +226,12 @@ VALUES (@Name, @Laboratory, @Person, @Structure, @State, @MeltingPoint, @Conditi
             return Result;
         }
 
-        // Проверка соответствия молекулы паттерну.
+        /// <summary>
+        /// Проверка соответствия молекулы паттерну.
+        /// </summary>
+        /// <param name="Mol"></param>
+        /// <param name="DB_Mol"></param>
+        /// <returns></returns>
         static bool CheckMol(string Mol, string DB_Mol)
         {
             // Создаём объекты OpenBabel
@@ -218,7 +256,13 @@ VALUES (@Name, @Laboratory, @Person, @Structure, @State, @MeltingPoint, @Conditi
         }
 
 
-        // Преобразование выдачи БД в формат для передачи клиенту
+        /// <summary>
+        /// Преобразование выдачи БД в формат для передачи клиенту
+        /// </summary>
+        /// <param name="DataBase"></param>
+        /// <param name="dt"></param>
+        /// <param name="i"></param>
+        /// <returns></returns>
         private static Molecule_Transport DataRow_To_Molecule_Transport(DB DataBase, DataTable dt, int i)
         {
             /*
@@ -299,7 +343,12 @@ VALUES (@Name, @Laboratory, @Person, @Structure, @State, @MeltingPoint, @Conditi
             return MT;
         }
 
-        // Поиск элементов в БД
+        /// <summary>
+        /// Поиск элементов в БД
+        /// </summary>
+        /// <param name="DataBase"></param>
+        /// <param name="Query"></param>
+        /// <returns></returns>
         static List<string> GetRows(DB DataBase, string Query)
         {
             List<string> Result = new List<string>();
@@ -329,13 +378,25 @@ VALUES (@Name, @Laboratory, @Person, @Structure, @State, @MeltingPoint, @Conditi
             return Result;
         }
 
-        // NotNull без пробелов элемент из БД
+        /// <summary>
+        /// NotNull без пробелов элемент из БД
+        /// </summary>
+        /// <param name="dt"></param>
+        /// <param name="i"></param>
+        /// <param name="j"></param>
+        /// <returns></returns>
         static string FromBase(DataTable dt, int i, int j)
         {
             return NotNull(dt.Rows[i].ItemArray[j].ToString().Trim("\n"[0]));
         }
 
-        // NotNull без пробелов элемент из БД
+        /// <summary>
+        /// NotNull без пробелов зашифрованный элемент из БД
+        /// </summary>
+        /// <param name="dt"></param>
+        /// <param name="i"></param>
+        /// <param name="j"></param>
+        /// <returns></returns>
         static string FromBaseDecrypt(DataTable dt, int i, int j)
         {
             return NotNull(ConsoleServer.Program.CommonAES.DecryptStringFromBytes(

@@ -61,6 +61,7 @@ FROM `persons`
 INNER JOIN `laboratory` ON (`laboratory`.`id` = `persons`.`laboratory`)";
 
             // Начальная инициация переменных, чтобы из IF(){} вышли
+            string ID = "";
             string Surname = "";
             string Laboratory = "";
             string Permissions = "";
@@ -71,6 +72,7 @@ INNER JOIN `laboratory` ON (`laboratory`.`id` = `persons`.`laboratory`)";
             for (int i = 0; i < Params.Count(); i++)
             {
                 string[] Param = Params[i].ToLower().Split(' '); // Доп. параметр от значения отделяется пробелом
+                if (Param[0] == "id") ID = SimpleParam(Param);                    // Показать пользователей по ID
                 if (Param[0] == "surname") Surname = SimpleParam(Param);          // Показать пользователей по фамилии
                 if (Param[0] == "laboratory") Laboratory = SimpleParam(Param);    // Показать пользователей по лаборатории
                 if (Param[0] == "permissions") Permissions = SimpleParam(Param);  // Показать пользователей по правам
@@ -82,6 +84,7 @@ INNER JOIN `laboratory` ON (`laboratory`.`id` = `persons`.`laboratory`)";
                 {
                     SimpleMsg(handler, @"user.list shows list of all users on the server. There are several filter parameters:
 
+ - id [Number] - Show person with ID = Number;
  - surname [Name] - Show persons with surname containings [Name];
  - laboratory [ABB] - Shows persons of this laboratory;
  - permissions [Number] - Shows persons with certain permissions;
@@ -95,6 +98,9 @@ Parameters may be combined.");
 
             // WHERE будет всегда – показываем только неудалённых
             Query += "\nWHERE (`active` = 1)";
+
+            //Выберем по фамилии
+            if (ID != "") Query += " AND (`id` = " + ID + ")";
 
             //Выберем по фамилии
             if (Surname != "") Query += " AND (`Surname` LIKE '%" + Surname + "%')";

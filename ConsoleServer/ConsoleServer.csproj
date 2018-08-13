@@ -57,6 +57,7 @@
     <Compile Include="Commands.cs" />
     <Compile Include="Commands.Database.cs" />
     <Compile Include="Commands.Laboratories.cs" />
+    <Compile Include="Commands.Log.cs" />
     <Compile Include="Commands.Molecules.cs" />
     <Compile Include="Commands.User.cs" />
     <Compile Include="DB.cs" />
@@ -64,6 +65,7 @@
     <Compile Include="Molecule_Transport.cs" />
     <Compile Include="Program.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="StringExtention.cs" />
     <Compile Include="User.cs" />
   </ItemGroup>
   <ItemGroup>

@@ -8,7 +8,7 @@ using System.Data;
 
 namespace ConsoleServer
 {
-    // Класс для работы с пересылаемыми файлами. Поскольку File уже занять, назвал Files
+    // Класс для работы с пересылаемыми файлами. Поскольку File уже занят, назвал Files
     public class Files
     {
         public string Name;             // Название документа. Может быть любым

@@ -5,6 +5,7 @@ using System.Text;
 using System.Security.Cryptography;
 using MySql.Data.MySqlClient;
 using System.Data;
+using System.Net.Sockets;
 
 namespace ConsoleServer
 {
@@ -419,6 +420,23 @@ namespace ConsoleServer
                 default:
                     return "`person` = " + ID.ToString();
             }
+        }
+
+        /// <summary>
+        /// Выдаёт ID пользователя по логину или -1, если пользователь не найден
+        /// </summary>
+        /// <param name="handler"></param>
+        /// <param name="Name"></param>
+        /// <param name="DataBase"></param>
+        /// <returns></returns>
+        public static string PersonID(Socket handler, string Name, DB DataBase )
+        {
+            int Num = GetIDByLogin(DataBase, Name);
+            if (Num == -1)
+            {
+                Program.SimpleMsg(handler, "ERROR – UNKNOWN USER '" + Name + "'");
+            }
+            return Num.ToString();
         }
 
         const string Salt =   @"ДжОнатан Билл, 

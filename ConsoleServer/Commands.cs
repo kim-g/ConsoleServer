@@ -91,13 +91,7 @@ namespace Commands
     }
 
 
-    class Log
-    {
-        // СК по журналу
-        public const string Help = "log";    // Справка по использованию журнала
-        public const string Session = "log.sessions";    // Показать список сессий
-        public const string Query = "log.queries";    // Показать список запросов.
-    }
+
 
     
 

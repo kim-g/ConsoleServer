@@ -9,464 +9,72 @@ using System.IO;
 using System.Net;
 using System.Net.Sockets;
 using MySql.Data.MySqlClient;
+using Extentions;
 
 namespace ConsoleServer
 {
     public class Program
     {
-        // Отладочные команды. Для релиза поставить FALSE
-        const bool DEBUG = true;
-
         // Параметры БД
         static string DB_Server = "127.0.0.1";
         static string DB_Name = "mol_base";
         static string DB_User = "Mol_Base";
         static string DB_Pass = "Yrjksorybakpetudomgztyu73ju96m";
 
-        // Сама БД
+        /// <summary>
+        /// База данных MySQL, из которой берётся вся информация
+        /// </summary>
         static DB DataBase;
 
-        // Ключ и вектор для шифрования
+        /// <summary>
+        /// Ключ и вектор для шифрования
+        /// </summary>
         public static AES_Data CommonAES;
 
-        // Список активных пользователей
+        /// <summary>
+        /// Список активных пользователей
+        /// </summary>
         public static List<User> Active_Users = new List<User>();
 
-        // Время бездействия пользователя до принудительного выхода
+        /// <summary>
+        /// Время бездействия пользователя до принудительного выхода
+        /// </summary>
         const int UserTimeOut = 3600;
 
-        public static void SendMsg(Socket handler, string Msg)
-        {
-            byte[] msg = Encoding.UTF8.GetBytes(Msg + "\n");
-            handler.Send(msg);
-        }
-
-
-
-        // Определение прав на выдачу результатов для пользователя
-        static string GetQueryRights()
-        {
-            return "TRUE";
-        }
-
-
-        // Поиск элементов в БД
-        public static List<string> GetRows(string Query)
-        {
-            List<string> Result = new List<string>();
-
-            // Получение данных из БД по запросу
-            DataTable DT = DataBase.Query(Query);
-
-            if (DT.Rows.Count > 0)  // Выводим результат
-            {
-                for (int i = 0; i < DT.Rows.Count; i++)
-                {
-                    for (int j = 0; j < DT.Columns.Count; j++)
-                    {
-                        Result.Add(NotNull(DT.Rows[i].ItemArray[j].ToString().Trim("\n"[0])));
-                    }
-                }
-
-            }
-            else
-            {
-                for (int j = 1; j < DT.Columns.Count; j++)
-                {
-                    Result.Add("ERROR 2 – Data not found");
-                }
-            }
-
-            return Result;
-        }
-
-        // NotNull без пробелов элемент из БД
-        static string FromBase(DataTable dt, int i, int j)
-        {
-            return NotNull(dt.Rows[i].ItemArray[j].ToString().Trim("\n"[0]));
-        }
-
-        // NotNull без пробелов элемент из БД
-        static string FromBaseDec(DataTable dt, int i, int j)
-        {
-            return NotNull(CommonAES.DecryptStringFromBytes(
-                dt.Rows[i].ItemArray[j] as byte[])).Trim(new char[] { "\n"[0], ' ' });
-        }
-
-        // УСТАРЕЛО!!!
-        // Поиск по подструктуре из БД с расшифровкой
-        public static List<string> Get_Mol(User CurUser, string Sub_Mol = "", string Request = "Permission", int Status = 0)
-        {
-            //Создаём новые объекты
-            List<string> Result = new List<string>(); //Список вывода
-
-            //Создаём запрос на поиск
-            string queryString = @"SELECT `id`, `name`, `laboratory`, `person`, `b_structure`, `state`,
-`melting_point`, `conditions`, `other_properties`, `mass`, `solution`, `status` ";
-            queryString += "\nFROM `molecules` \n";
-            queryString += "WHERE (" + CurUser.GetPermissionsOrReqest(Request) + ")";
-            if (Status > 0) queryString += " AND (`status` = " + Status.ToString() + ")"; // Добавляем статус в запрос
-
-            DataTable dt = DataBase.Query(queryString);
-
-            if (Sub_Mol == "")
-            {
-                for (int i = 0; i < dt.Rows.Count; i++)
-                    Result.Add(DataRow_To_Molecule_Transport(dt, i).ToXML());
-
-            }
-
-            else
-            {
-                // Сравнение каждой молекулы из запроса со стандартом
-                for (int i = 0; i < dt.Rows.Count; i++)
-                {
-                    //Расшифровка
-                    string Structure = CommonAES.DecryptStringFromBytes(dt.Rows[i].ItemArray[4] as byte[]);
-
-                    if (CheckMol(Sub_Mol, Structure))
-                        Result.Add(DataRow_To_Molecule_Transport(dt, i).ToXML());
-                };
-            }
-
-            DataBase.ConClose();
-            return Result;
-        }
-
-        // УСТАРЕЛО!!!
-        private static Molecule_Transport DataRow_To_Molecule_Transport(DataTable dt, int i)
-        {
-            /*
-                                Структура данных: (-> - Открытый, => - закодированный)
-                                -> New molecule
-                                00 -> id
-                                01 -> name
-                                02 -> laboratory
-                                03 -> person
-                                04 => b_structure
-                                05 => state
-                                06 => melting_point
-                                07 => conditions
-                                08 => other_properties
-                                09 => mass
-                                10 => solution
-                                11 -> laboratory_name
-                                12 -> laboratory_Abb
-                                13 -> name (person)
-                                14 -> father's name
-                                15 -> surname
-                                16 -> job
-                                17 -> status
-                                18+ -> Виды анализа
-                                */
-
-            // Наполнение транспортного класса
-            Molecule_Transport MT = new Molecule_Transport();
-            MT.ID = Convert.ToInt32(FromBase(dt, i, 0));
-            MT.Name = FromBase(dt, i, 1);
-            MT.Laboratory = new laboratory();
-            MT.Laboratory.ID = Convert.ToInt32(FromBase(dt, i, 2));
-            List<string> Lab = GetRows("SELECT `name`, `abbr` FROM `laboratory` WHERE `id`=" +
-                dt.Rows[i].ItemArray[2].ToString() + " LIMIT 1");
-            MT.Laboratory.Name = Lab[0];
-            MT.Laboratory.Abb = Lab[1];
-            List<string> Per = GetRows(@"SELECT `name`, `fathers_name`, `Surname`, `job` 
-                        FROM `persons` 
-                        WHERE `id`= " + dt.Rows[i].ItemArray[3].ToString() + @"
-                        LIMIT 1");
-            MT.Person = new person();
-            MT.Person.ID = Convert.ToInt32(FromBase(dt, i, 3));
-            MT.Person.Name = Per[0];
-            MT.Person.FathersName = Per[1];
-            MT.Person.Surname = Per[2];
-            MT.Person.Job = Per[3];
-            MT.Structure = FromBaseDec(dt, i, 4);
-            MT.State = FromBaseDec(dt, i, 5);
-            MT.Melting_Point = FromBaseDec(dt, i, 6);
-            MT.Conditions = FromBaseDec(dt, i, 7);
-            MT.Other_Properties = FromBaseDec(dt, i, 8);
-            MT.Mass = FromBaseDec(dt, i, 9);
-            MT.Solution = FromBaseDec(dt, i, 10);
-            MT.Status = Convert.ToInt32(FromBase(dt, i, 11));
-            MT.Analysis = GetRows(@"SELECT `analys`.`name`, `analys`.`name_whom` 
-                        FROM `analys` 
-                          INNER JOIN `analys_to_molecules` ON `analys_to_molecules`.`analys` = `analys`.`id`
-                        WHERE `analys_to_molecules`.`molecule` = " + dt.Rows[i].ItemArray[0].ToString() + ";");
-
-            // Добавляем список файлов
-            MT.Files = new List<file>();
-            //   Получаем файлы, имеющие отношение к данному соединению
-            DataTable files = DataBase.Query(@"SELECT `file` 
-                        FROM `files_to_molecules` 
-                        WHERE `molecule` = " + dt.Rows[i].ItemArray[0].ToString() + ";");
-            for (int f = 0; f < files.Rows.Count; f++)
-            {
-                file NF = new file();
-                NF.ID = (int)files.Rows[f].ItemArray[0];
-                DataTable NewFile = DataBase.Query(@"SELECT `name` FROM files WHERE `id`=" +
-                    NF.ID.ToString() + @" LIMIT 1;");
-                if (NewFile.Rows.Count == 0) { NF.Name = "Файл отсутствует"; }
-                else { NF.Name = NewFile.Rows[0].ItemArray[0].ToString(); }
-
-                MT.Files.Add(NF);
-            }
-
-            return MT;
-        }
-
-        static string NotNull(string Text)
-        {
-            return Text != "" ? Text : "<@None@>";
-        }
-
-        // УСТАРЕЛО!!!
-        public static bool CheckMol(string Mol, string DB_Mol)
-        {
-            // Создаём объекты OpenBabel
-            OBSmartsPattern SP = new OBSmartsPattern();
-            OBConversion obconv = new OBConversion();
-            OBMol mol = new OBMol();
-            obconv.SetInFormat("smi");  //У нас всё в формате SMILES
-            obconv.ReadString(mol, Mol);
-            if (!mol.DeleteHydrogens()) { Console.WriteLine("DeleteHidrogens() failed!"); };  //Убираем все водороды
-            obconv.SetOutFormat("smi");
-
-            string SubMol = System.Text.RegularExpressions.Regex.Replace(obconv.WriteString(mol), "[Hh ]", ""); //Убираем все водороды
-            SP.Init(SubMol);  //Задаём структуру поиска в SMARTS
-
-            obconv.SetInFormat("smi");
-            obconv.ReadString(mol, DB_Mol); //Добавляем структуру из БД
-            SP.Match(mol); //Chfdybdftv
-            VectorVecInt Vec = SP.GetUMapList();
-            if (Vec.Count > 0) { return true; } else { return false; }; //Возвращаем результат
-        }
-
-        // УСТАРЕЛО!!!
-        static void Add_User_to_DB(Socket handler, User CurUser, string UserName, string Password)
-        {
-            if (CurUser.GetUserAddRermissions())
-            {
-                User NewUser = new User(UserName, Password, "–", "–", UserName, 0, "1", "1", DataBase);
-                SendMsg(handler, Commands.Answer.StartMsg);
-                SendMsg(handler, "Add_User: done");
-                SendMsg(handler, Commands.Answer.EndMsg);
-                return;
-            }
-            SendMsg(handler, Commands.Answer.StartMsg);
-            SendMsg(handler, "Add_User: No permissions");
-            SendMsg(handler, Commands.Answer.EndMsg);
-        }
-
-        // УСТАРЕЛО!!!
-        // Кодирует структуры заданным ключом. ADMIN ONLY
-        static void EncryptAll(Socket handler, User CurUser)
-        {
-            if (!CurUser.GetAdminRermissions())
-            {
-                SendMsg(handler, Commands.Answer.StartMsg);
-                SendMsg(handler, "ERROR: Access denied!");
-                SendMsg(handler, Commands.Answer.EndMsg);
-                return;
-            }
-
-
-
-            string queryString = "SELECT `id`, `name`, `IUPAC`, `structure`\n";
-            queryString += "FROM `molecules`;";
-
-            DataTable dt = DataBase.Query(queryString);
-
-            SendMsg(handler, Commands.Answer.StartMsg);
-            SendMsg(handler, "OK");
-            SendMsg(handler, Commands.Answer.EndMsg);
-
-            for (int i = 0; i < dt.Rows.Count; i++)
-            {
-
-                byte[] EncryptData = CommonAES.EncryptStringToBytes(dt.Rows[i].ItemArray[3].ToString());
-
-                string QS = @"UPDATE `molecules` 
-SET `b_s_size` = @BS_Size, `b_structure` = @B_Strucrure 
-WHERE `id` = " + dt.Rows[i].ItemArray[0].ToString();
-                MySqlCommand UpdCom = DataBase.MakeCommandObject(QS);
-                UpdCom.Parameters.AddWithValue("@BS_Size", EncryptData.Length);
-                UpdCom.Parameters.AddWithValue("@B_Strucrure", EncryptData);
-                UpdCom.ExecuteNonQuery();
-            };
-        }
-
-        static string NotNullSQL(string Text)
-        {
-            if (Text != "") { return Text; }
-            return "NULL";
-        }
-
-        // УСТАРЕЛО!!!
-        static void AddMolecule(Socket handler, User CurUser, string[] Data)
-        {
-            string queryString = @"INSERT INTO `molecules` 
-(`name`, `laboratory`, `person`, `b_structure`, `state`, `melting_point`, `conditions`, `other_properties`, `mass`, `solution`)
-VALUES (@Name, @Laboratory, @Person, @Structure, @State, @MeltingPoint, @Conditions, @OtherProperties, @Mass, @Solution);";
-
-            MySqlCommand com = DataBase.MakeCommandObject(queryString);
-            com.Parameters.AddWithValue("@Name", Data[3]);
-            com.Parameters.AddWithValue("@Laboratory", Data[4]);
-            com.Parameters.AddWithValue("@Person", Data[5]);
-            com.Parameters.AddWithValue("@Structure", CommonAES.EncryptStringToBytes(Data[6]));
-            com.Parameters.AddWithValue("@State", CommonAES.EncryptStringToBytes(Data[7]));
-            com.Parameters.AddWithValue("@MeltingPoint", CommonAES.EncryptStringToBytes(Data[8]));
-            com.Parameters.AddWithValue("@Conditions", CommonAES.EncryptStringToBytes(Data[9]));
-            com.Parameters.AddWithValue("@OtherProperties", CommonAES.EncryptStringToBytes(Data[10]));
-            com.Parameters.AddWithValue("@Mass", CommonAES.EncryptStringToBytes(Data[11]));
-            com.Parameters.AddWithValue("@Solution", CommonAES.EncryptStringToBytes(Data[12]));
-
-            com.ExecuteNonQuery();
-
-            SendMsg(handler, Commands.Answer.StartMsg);
-            SendMsg(handler, "Add_Molecule: done");
-            SendMsg(handler, Commands.Answer.EndMsg);
-        }
-
-        // УСТАРЕЛО!!!
-        // Проверка имени пользователя и пароля
-        static void LoginMsg(Socket handler, string _User, string _Password, int LogID)
-        {
-            // Найдём уже залогиненных пользователей с таким же ником
-            List<User> UserList = Active_Users.FindAll(x => x.GetLogin() == _User);
-            foreach (User x in UserList)       // И всех их «выйдем»
-            {
-                x.Quit("User Relogin");
-            }
-
-            // ...удалив из списка
-            if (UserList != null)
-            {
-                Active_Users.RemoveAll(x => x.GetLogin() == _User);
-            };
-
-            // Залогинемся. Здесь происходит обращение к БД. В случае ошибки UserID будет User.NoUserID
-            User NewUser = new User(_User, _Password, DataBase,
-                ((IPEndPoint)handler.RemoteEndPoint).Address.ToString());
-
-            // Если такой пользователь есть, то добавим его в список
-            if (NewUser.GetUserID() != User.NoUserID)
-            { Active_Users.Add(NewUser); }
-            else   // Если нет, то напишем об этом в журнал
-            {
-                DataBase.ExecuteQuery("UPDATE `queries` SET `comment` = '! User name and/or pasword invalid' " +
-                                    "WHERE `id` = " + LogID.ToString() + ";");
-            }
-
-            SendMsg(handler, Commands.Answer.StartMsg);
-            SendMsg(handler, Commands.Answer.LoginOK);
-            SendMsg(handler, NewUser.GetUserID());
-            SendMsg(handler, NewUser.GetID().ToString());
-            SendMsg(handler, NewUser.GetFullName());
-            if (NewUser.IsAdmin()) { SendMsg(handler, Commands.Answer.Answer_Admin); };
-            if (NewUser.IsManager()) { SendMsg(handler, Commands.Answer.Answer_Manager); };
-            SendMsg(handler, Commands.Answer.EndMsg);
-        }
-
-        // УСТАРЕЛО!!!
-        static void SendStatusList(Socket handler)
-        {
-            List<string> Res = GetRows("SELECT * FROM `status`");
-            SendMsg(handler, Commands.Answer.StartMsg);
-            for (int i = 0; i < Res.Count; i++)
-                SendMsg(handler, Res[i]);
-            SendMsg(handler, Commands.Answer.EndMsg);
-        }
-
-        // Программа для передачи файла из БД клиенту
-        static void SendFile(Socket handler, User CurUser, string FileID)
-        {
-            Files FileToSend = Files.Read_From_DB(DataBase, Convert.ToInt32(FileID), CurUser);
-            SendFileSize(handler, FileToSend);
-
-            int FtS_Size = FileToSend.Data.Count();
-            for (int i = 0; i < FtS_Size; i += 1024)
-            {
-
-                int block;
-                if (FtS_Size - i < 1024) { block = FtS_Size - i; }
-                else { block = 1024; }
-
-                byte[] buf = new byte[block];
-                FileToSend.DataStream.Read(buf, 0, block);
-                handler.Send(buf);
-            }
-
-            FileToSend.Save();
-        }
-
-        // Передаёт клиенту размер файла
-        static void SendFileSize(Socket handler, Files FileToSend)
-        {
-            byte[] msg = Encoding.UTF8.GetBytes(Commands.Answer.StartMsg + "\n" + FileToSend.FileName + "\n" + FileToSend.Data.Count().ToString() + "\n");
-            //Console.WriteLine(msg.Length.ToString() + "; \"" + msg + "\"");
-            handler.Send(BitConverter.GetBytes(msg.Length));
-            handler.Send(msg);
-        }
-
-        // Отладочная программа для тестирования приёма файла от клиента
-        static void GetFileTemp(Socket handler, string FileName, string FileSize)
-        {
-            byte[] ResFile = new byte[Convert.ToInt32(FileSize)];
-            handler.Receive(ResFile);
-
-            Files FileToAdd = new Files(FileName, FileName, ResFile);
-            FileToAdd.Add_To_DB(DataBase, CommonAES, 1, 1);
-
-            SendMsg(handler, Commands.Answer.StartMsg);
-            SendMsg(handler, "OK");
-            SendMsg(handler, Commands.Answer.EndMsg);
-        }
-
-        // Программа для приёма файла от клиента
-        static void GetFile(Socket handler, User CurUser, string FileName, string Name, string FileSize,
-            string MoleculeID)
-        {
-            int FileSizei = Convert.ToInt32(FileSize);
-            byte[] ResFile = new byte[FileSizei];
-
-            Stream ms = new MemoryStream();
-            for (int i = 0; i < FileSizei; i += 1024)
-            {
-                int Size = 1024;
-                if (FileSizei - i < 1024) Size = FileSizei - i;
-                byte[] Block = new byte[Size];
-                handler.Receive(Block, Size, SocketFlags.None);
-                ms.Write(Block, 0, Size);
-            }
-            ms.Position = 0;
-            ms.Read(ResFile, 0, FileSizei);
-
-            Files FileToAdd = new Files(Name, FileName, ResFile);
-            int FileID = FileToAdd.Add_To_DB(DataBase, CommonAES, CurUser.GetID(), CurUser.GetLaboratory());
-            Console.WriteLine("NewID: {0}", FileID);
-
-            DataBase.ExecuteQuery(@"INSERT INTO `files_to_molecules` (`file`, `molecule`)
-VALUES (" + FileID + ", " + MoleculeID + ")");
-
-            SendMsg(handler, Commands.Answer.StartMsg);
-            SendMsg(handler, FileID.ToString());
-            SendMsg(handler, Commands.Answer.EndMsg);
-        }
-
-        // УСТАРЕЛО!!!
-        // Выход пользователя
-        static void User_Quit(Socket handler, User CurUser)
-        {
-            CurUser.Quit("User Quited");
-            Active_Users.Remove(CurUser);
-            SendMsg(handler, Commands.Answer.StartMsg);
-            SendMsg(handler, "OK");
-            SendMsg(handler, Commands.Answer.EndMsg);
-        }
-
-
+        /// <summary>
+        /// Базовый функционал программы.
+        /// </summary>
+        /// <param name="args"></param>
         static void Main(string[] args)
         {
+            try
+            {
+                //Подключаемся к БД
+                DataBase = new DB(DB_Server, DB_Name, DB_User, DB_Pass);
+
+                Console.WriteLine("Подключение к MySQL: 127.0.0.1:3306");
+            }
+            catch
+            {
+                Console.WriteLine("Ошибка подключения к БД");
+            }
+
+            // Создаём классы для обработки команд
+            List<Commands.ExecutableCommand> BaseCommands = new List<Commands.ExecutableCommand>()
+            {
+                new Commands.Account(DataBase),
+                new Commands.Database(DataBase),
+                new Commands.FileEngine(DataBase),
+                new Commands.Global(DataBase),
+                new Commands.Laboratories(DataBase),
+                new Commands.Log(DataBase),
+                new Commands.Molecules(DataBase),
+                new Commands.Users(DataBase),
+                new Commands.Status(DataBase)
+            };
+
+            Commands.Log Log = (Commands.Log)(BaseCommands.Where(x => x.Name == "log").ToArray()[0]);
+
             // Открываем файл-ключ
             CommonAES = AES_Data.LoadFromFile("vector.bin");
 
@@ -481,12 +89,6 @@ VALUES (" + FileID + ", " + MoleculeID + ")");
             {
                 sListener.Bind(ipEndPoint);
                 sListener.Listen(10);
-
-
-                //Подключаемся к БД
-                DataBase = new DB(DB_Server, DB_Name, DB_User, DB_Pass);
-
-                Console.WriteLine("Подключение к MySQL: 127.0.0.1:3306");
 
                 Console.WriteLine("Старт сервера");
 
@@ -558,159 +160,34 @@ VALUES (" + FileID + ", " + MoleculeID + ")");
                     }
 
                     // И добавляем в лог
-                    int LogID = Commands.Log.SaveQuery(handler, DataBase, CurUser, data_parse[0], Params);
+                    int LogID = Log.SaveQuery(handler, CurUser, data_parse[0], Params);
 
                     // Обработка классом Commands.
 
                     string[] Command = data_parse[0].Split('.');
 
-                    // Обработка отдельных классов
-                    switch (Command[0].ToLower())
+                    // Выполним операцию, если команда требует стандартных параметров
+                    foreach (Commands.IStandartCommand Block in BaseCommands.OfType<Commands.IStandartCommand>())
                     {
-                        case Commands.Laboratories.Name:
-                            {
-                                Commands.Laboratories.Execute(handler, CurUser, DataBase, Command,
-                                    GetParameters(data_parse));
-                                FinishConnection(handler);
-                                continue;
-                            }
-                        case Commands.Users.Name:
-                            {
-                                Commands.Users.Execute(handler, CurUser, DataBase, Command,
-                                    GetParameters(data_parse));
-                                FinishConnection(handler);
-                                continue;
-                            }
-                        case Commands.Molecules.Name:
-                            {
-                                Commands.Molecules.Execute(handler, CurUser, DataBase, Command,
-                                    GetParameters(data_parse));
-                                FinishConnection(handler);
-                                continue;
-                            }
-
-                        case Commands.Account.Name:
-                            {
-                                Commands.Account.Execute(handler, CurUser, Active_Users, DataBase, Command,
-                                    GetParameters(data_parse), LogID);
-                                FinishConnection(handler);
-                                continue;
-                            }
-                        case Commands.Database.Name:
-                            {
-                                Commands.Database.Execute(handler, CurUser, DataBase, Command,
-                                    GetParameters(data_parse));
-                                FinishConnection(handler);
-                                continue;
-                            }
-                        case Commands.Log.Name:
-                            {
-                                Commands.Log.Execute(handler, CurUser, DataBase, Command,
-                                    GetParameters(data_parse));
-                                FinishConnection(handler);
-                                continue;
-                            }
-                    };
-
-                        // Обрабатываем запрос в оставшихся случаях.
-                        switch (data_parse[0].Trim())
+                        if (Command[0].ToLower() == Block.To<Commands.ExecutableCommand>().Name)
                         {
-                            case Commands.Global.Add_User:
-                                {
-                                    Add_User_to_DB(handler, CurUser, data_parse[3], data_parse[4]);
-                                    break;
-                                }
-                            case "<@Encrypt_All@>":
-                                {
-                                    EncryptAll(handler, CurUser);
-                                    break;
-                                }
-                            case Commands.Global.Add_Mol:
-                                {
-                                    AddMolecule(handler, CurUser, data_parse);
-                                    break;
-                                }
-                            case Commands.Global.Login:
-                                {
-                                    LoginMsg(handler, data_parse[3], data_parse[4], LogID);
-                                    break;
-                                }
-
-                            case Commands.Global.All_Users:
-                                {
-                                    AllUsersMsg(handler, CurUser);
-                                    break;
-                                }
-                            case Commands.Global.ShowHash:
-                                {
-                                    if (!CurUser.IsAdmin()) { break; }
-
-                                    string Password = data_parse[3].Trim(new char[] { "\n"[0], "\r"[0], ' ' });
-                                    SendMsg(handler, Commands.Answer.StartMsg);
-                                    SendMsg(handler, User.GetPasswordHash(Password));
-                                    SendMsg(handler, Commands.Answer.EndMsg);
-                                    break;
-                                }
-                            case Commands.Global.GetStatuses:
-                                {
-                                    SendStatusList(handler);
-                                    break;
-                                }
-                            case Commands.Global.SendFileMsg:
-                                {
-                                    SendFile(handler, CurUser, data_parse[3]);
-                                    break;
-                                }
-                            case Commands.Global.GetFileMsg:
-                                {
-                                    GetFile(handler, CurUser, data_parse[3], data_parse[4], data_parse[5],
-                                        data_parse[6]);
-                                    break;
-                                }
-                            case Commands.Global.QuitMsg:
-                                {
-                                    User_Quit(handler, CurUser);
-                                    break;
-                                }
-                            case Commands.Global.FN_msg:
-                                {
-                                    GetFileName(handler, CurUser, data_parse[3]);
-                                    break;
-                                }
-                            case Commands.Global.Increase_Status:
-                                {
-                                    IncreaseStatus(handler, CurUser, data_parse[3]);
-                                    break;
-                                }
-                            case Commands.Global.Help:
-                                {
-                                    SendMsg(handler, Commands.Answer.StartMsg);
-                                    SendMsg(handler, @"Administrator's console. Gives the direct access to server. Possible comands:
- - log - direct access to server's logs;
- - database - direct access to server's database;
- - users - direct access to list of users
- - molecules - direct access to molecules list;
- - account - commands to log in and quit
- - laboratories - direct access to list of laboratories");
-                                    SendMsg(handler, Commands.Answer.EndMsg);
-                                    break;
-                                }
-                            case Commands.Database.LastID:
-                                {
-                                    SendMsg(handler, Commands.Answer.StartMsg);
-                                    SendMsg(handler, DataBase.GetLastID().ToString());
-                                    SendMsg(handler, Commands.Answer.EndMsg);
-                                    break;
-                                }
-                            default:
-                                {
-                                    Commands.Log.AddToQueryLog(DataBase, LogID, "! Unknown command");
-                                    SendMsg(handler, Commands.Answer.StartMsg);
-                                    SendMsg(handler, "Error 1: Unknown command in line 0");
-                                    SendMsg(handler, Commands.Answer.EndMsg);
-                                    break;
-                                }
+                            Block.Execute(handler, CurUser, Command, GetParameters(data_parse));
+                            FinishConnection(handler);
+                            continue;
                         }
+                    }
+
+                    // Выполним операцию, если команда требует расширенных параметров
+                    foreach (Commands.IUserListCommand Block in BaseCommands.OfType<Commands.IUserListCommand>())
+                    {
+                        if (Command[0].ToLower() == Block.To<Commands.ExecutableCommand>().Name)
+                        {
+                            Block.Execute(handler, CurUser, Command, GetParameters(data_parse), 
+                                Active_Users, LogID);
+                            FinishConnection(handler);
+                            continue;
+                        }
+                    }
 
                     if (data.IndexOf("<TheEnd>") > -1)
                     {
@@ -731,6 +208,21 @@ VALUES (" + FileID + ", " + MoleculeID + ")");
             }
         }
 
+        /// <summary>
+        /// Отправка текстового сообщения через сокет.
+        /// </summary>
+        /// <param name="handler"></param>
+        /// <param name="Msg"></param>
+        public static void SendMsg(Socket handler, string Msg)
+        {
+            byte[] msg = Encoding.UTF8.GetBytes(Msg + "\n");
+            handler.Send(msg);
+        }
+
+        /// <summary>
+        /// Завершение соединения через сокет.
+        /// </summary>
+        /// <param name="handler"></param>
         private static void FinishConnection(Socket handler)
         {
             handler.Shutdown(SocketShutdown.Both);
@@ -739,92 +231,11 @@ VALUES (" + FileID + ", " + MoleculeID + ")");
             GC.Collect();
         }
 
-        // УСТАРЕЛО!!!
-        private static void Molecule_Search(Socket handler, User CurUser, string[] Params)
-        {
-            throw new NotImplementedException();
-        }
-
-        // УСТАРЕЛО!!!
-        private static void Molecule_Add(Socket handler, User CurUser, string[] Params)
-        {
-            // Начальная инициация переменных, чтобы из IF(){} вышли
-            string Subst = "";
-            string Lab = "";
-            string Person = "";
-            string Structure = "";
-            string PhysState = "";
-            string Melt = "";
-            string Conditions = "";
-            string Properties = "";
-            string Mass = "";
-            string Solution = "";
-
-            // Ищем данные
-            foreach (string Line in Params)
-            {
-                string[] Param = Line.Split(' ');
-
-                if (Param[0] == "code") Subst = Param[1].Replace("\n", "").Replace("\r", "");
-                if (Param[0] == "laboratory") Lab = Param[1].Replace("\n", "").Replace("\r", "");
-                if (Param[0] == "person") Person = Param[1].Replace("\n", "").Replace("\r", "");
-                if (Param[0] == "structure") Structure = Param[1].Replace("\n", "").Replace("\r", "");
-                if (Param[0] == "phys_state") PhysState = Param[1].Replace("\n", "").Replace("\r", "");
-                if (Param[0] == "melting_point") Melt = Param[1].Replace("\n", "").Replace("\r", "");
-                if (Param[0] == "conditions") Conditions = Param[1].Replace("\n", "").Replace("\r", "");
-                if (Param[0] == "properties") Properties = Param[1].Replace("\n", "").Replace("\r", "");
-                if (Param[0] == "mass") Mass = Param[1].Replace("\n", "").Replace("\r", "");
-                if (Param[0] == "solution") Solution = Param[1].Replace("\n", "").Replace("\r", "");
-
-                // Помощь
-                if (Param[0] == "help")
-                {
-                    SimpleMsg(handler, @"Command to add new molecule. Please, enter all information about the this. Parameters must include:
- - code [Name] - Code of the substance.
- - laboratory [Code] - ID of owner's laboratory.
- - person [Code] - ID of owner.
- - structure [SMILES] - molecular structure in SMILES format.
- - phys_state [Phrase] - physical state (liquid, gas, solid...).
- - melting_point [Temperature] - Temperature of melting point.
- - conditions [Phrase] - storage conditions. 
- - properties [Phrase] - other properties.
- - mass [grammes] - mass of surrendered sample.
- - solution [Phrase] - best solutions.");
-                }
-            }
-
-            // Проверяем, все ли нужные данные есть
-            if (Subst == "") { SimpleMsg(handler, "Error: No code entered"); return; }
-            if (Lab == "") { SimpleMsg(handler, "Error: No laboratory entered"); return; }
-            if (Person == "") { SimpleMsg(handler, "Error: No person entered"); return; }
-            if (Structure == "") { SimpleMsg(handler, "Error: No structure entered"); return; }
-            if (PhysState == "") { SimpleMsg(handler, "Error: No physical state entered"); return; }
-            if (Mass == "") { SimpleMsg(handler, "Error: No mass entered"); return; }
-            if (Solution == "") { SimpleMsg(handler, "Error: No solution entered"); return; }
-
-            // Добавление и шифровка
-            string queryString = @"INSERT INTO `molecules` 
-(`name`, `laboratory`, `person`, `b_structure`, `state`, `melting_point`, `conditions`, `other_properties`, `mass`, `solution`)
-VALUES (@Name, @Laboratory, @Person, @Structure, @State, @MeltingPoint, @Conditions, @OtherProperties, @Mass, @Solution);";
-
-            MySqlCommand com = DataBase.MakeCommandObject(queryString);
-            com.Parameters.AddWithValue("@Name", Subst);
-            com.Parameters.AddWithValue("@Laboratory", Lab);
-            com.Parameters.AddWithValue("@Person", Person);
-            com.Parameters.AddWithValue("@Structure", CommonAES.EncryptStringToBytes(Structure));
-            com.Parameters.AddWithValue("@State", CommonAES.EncryptStringToBytes(PhysState));
-            com.Parameters.AddWithValue("@MeltingPoint", CommonAES.EncryptStringToBytes(Melt));
-            com.Parameters.AddWithValue("@Conditions", CommonAES.EncryptStringToBytes(Conditions));
-            com.Parameters.AddWithValue("@OtherProperties", CommonAES.EncryptStringToBytes(Properties));
-            com.Parameters.AddWithValue("@Mass", CommonAES.EncryptStringToBytes(Mass));
-            com.Parameters.AddWithValue("@Solution", CommonAES.EncryptStringToBytes(Solution));
-
-            com.ExecuteNonQuery();
-
-            //И отпишемся.
-            SimpleMsg(handler, "Add_Molecule: done");
-        }
-
+        /// <summary>
+        /// Выделение параметров из полного сообщения
+        /// </summary>
+        /// <param name="data_parse"></param>
+        /// <returns></returns>
         private static string[] GetParameters(string[] data_parse)
         {
             string[] ShowParams = new string[data_parse.Count() - 3];
@@ -833,6 +244,12 @@ VALUES (@Name, @Laboratory, @Person, @Structure, @State, @MeltingPoint, @Conditi
             return ShowParams;
         }
 
+        /// <summary>
+        /// Выделение пользователя из списка активных пользователей по имени и кодовой фразе сессии
+        /// </summary>
+        /// <param name="UserName"></param>
+        /// <param name="UserID"></param>
+        /// <returns></returns>
         private static User GetCurUser(string UserName, string UserID)
         {
             User CurUser = Active_Users.Find(x => x.GetLogin() == UserName);
@@ -860,87 +277,11 @@ VALUES (@Name, @Laboratory, @Person, @Structure, @State, @MeltingPoint, @Conditi
             return CurUser;
         }
 
-        private static void AllUsersMsg(Socket handler, User CurUser)
-        {
-            if (!CurUser.GetAdminRermissions())
-            {
-                SendMsg(handler, Commands.Answer.StartMsg);
-                SendMsg(handler, "ERROR: Access denied!");
-                SendMsg(handler, Commands.Answer.EndMsg);
-                return;
-            }
-
-            SendMsg(handler, Commands.Answer.StartMsg);
-            foreach (User U in Active_Users)
-            {
-                SendMsg(handler, U.GetLogin() + " -> " + U.GetUserID());
-            }
-            SendMsg(handler, Commands.Answer.EndMsg);
-        }
-
-        private static void GetFileName(Socket handler, User CurUser, string FileID)
-        {
-            DataTable NewFile = DataBase.Query(@"SELECT `file_name` FROM files WHERE `id`=" +
-                            FileID + @" LIMIT 1;");
-            string Out;
-            if (NewFile.Rows.Count == 0) { Out = "Файл отсутствует"; }
-            else { Out = NewFile.Rows[0].ItemArray[0].ToString(); }
-
-            SimpleMsg(handler, Out);
-        }
-
-        // Изменить статус на 1
-        private static void IncreaseStatus(Socket handler, User CurUser, string MolID)
-        {
-            DataTable MolStatus = DataBase.Query(@"SELECT `status` FROM `molecules` WHERE (`id`=" +
-                            MolID + @") AND (" + CurUser.GetSearchRermissions() + @") LIMIT 1;");
-            if (MolStatus.Rows.Count == 0)
-            {
-                SimpleMsg(handler, "ERROR 101 – Not found or access denied");
-                return;
-            }
-            DataTable NewStatus = DataBase.Query(@"SELECT `next` FROM `status` WHERE (`id`=" +
-                            MolStatus.Rows[0].ItemArray[0].ToString() + @") LIMIT 1;");
-            if (NewStatus.Rows.Count == 0)
-            {
-                SimpleMsg(handler, "ERROR 102 – Status not found");
-                return;
-            }
-            if (NewStatus.Rows[0].ItemArray[0].ToString() == "-1")
-            {
-                SimpleMsg(handler, "ERROR 103 – Maximum status");
-                return;
-            }
-            if (DEBUG) Console.WriteLine(NewStatus.Rows[0].ItemArray[0]);
-
-            // Если ни одной ошибки не обнаружено, увеличиваем статус
-            DataBase.ExecuteQuery(@"UPDATE `molecules` SET `status` = " +
-                NewStatus.Rows[0].ItemArray[0].ToString() + @" WHERE `id` = " + MolID + @" LIMIT 1;");
-            SimpleMsg(handler, "OK");
-        }
-
-         public static bool IsAdmin(Socket handler, User CurUser)
-        {
-            // Если не админ, то ничего не покажем!
-            if (!CurUser.IsAdmin())
-            {
-                SimpleMsg(handler, "Access denied");
-                return false;
-            }
-            return true;
-        }
-
-        public static string PersonID(Socket handler, string Name)
-        {
-            int Num = User.GetIDByLogin(DataBase, Name);
-            if (Num == -1)
-            {
-                SimpleMsg(handler, "ERROR – UNKNOWN USER '" + Name + "'");
-                return "NoUser";
-            }
-            return Num.ToString();
-        }
-
+        /// <summary>
+        /// Отсылает клиенту простое текстовое сообщение.
+        /// </summary>
+        /// <param name="handler"></param>
+        /// <param name="Message"></param>
         public static void SimpleMsg(Socket handler, string Message)
         {
             SendMsg(handler, Commands.Answer.StartMsg);

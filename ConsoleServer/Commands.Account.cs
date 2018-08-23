@@ -8,18 +8,22 @@ using System.Text;
 
 namespace Commands
 {
-    class Account : ExecutableCommand
+    class Account : ExecutableCommand, IUserListCommand
     {
         // Команды по молекулам
-        public const string Name = "account";               // Название
         public const string Help = "help";                  // Подсказка
         public const string Login = "login";                // Войти
-        public const string LoginAll = Name + "." + Login;  // Полная команда на вход
+        public const string LoginAll = "account." + Login;  // Полная команда на вход
         public const string Quit = "quit";                  // Выйти
         public const string SetPassword = "set_password";   // Сменить пароль
 
-        public static void Execute(Socket handler, User CurUser, List<User> Active_Users, 
-            DB DataBase, string[] Command, string[] Params, int LogID)
+        public Account(DB dataBase) : base(dataBase)
+        {
+            Name = "account";
+        }
+
+        public void Execute(Socket handler, User CurUser, 
+            string[] Command, string[] Params, List<User> Active_Users, int LogID)
         {
             if (Command.Length == 1)
             {
@@ -30,21 +34,21 @@ namespace Commands
             switch (Command[1].ToLower())
             {
                 case Help: SendHelp(handler); break;
-                case Login: LogIn(handler, Active_Users, DataBase, Params, LogID); break;
+                case Login: LogIn(handler, Active_Users, Params, LogID); break;
                 case Quit: UserQuit(handler, CurUser, Active_Users); break;
                 case SetPassword: /*SearchMoleculesBySMILES(handler, CurUser, DataBase, Params); */break;
                 default: SimpleMsg(handler, "Unknown command"); break;
             }
         }
 
-        private static void UserQuit(Socket handler, User CurUser, List<User> Active_Users)
+        private void UserQuit(Socket handler, User CurUser, List<User> Active_Users)
         {
             CurUser.Quit("User Quited");
             Active_Users.Remove(CurUser);
             SimpleMsg(handler, "OK");
         }
 
-        private static void LogIn(Socket handler, List<User> Active_Users, DB DataBase, string[] Params,
+        private void LogIn(Socket handler, List<User> Active_Users, string[] Params,
             int LogID)
         {
             string UserName = "";
@@ -100,7 +104,7 @@ namespace Commands
             SendMsg(handler, Answer.EndMsg);
         }
 
-        private static void SendHelp(Socket handler)
+        private void SendHelp(Socket handler)
         {
             SimpleMsg(handler, @"Command for log in system. Possible comands:
  - account.login - Log in system

@@ -8,10 +8,9 @@ using System.Text;
 
 namespace Commands
 {
-    class Users : ExecutableCommand
+    class Users : ExecutableCommand, IStandartCommand
     {
         // СК по пользователям
-        public const string Name = "users";           // Название корневой команды
         public const string Help = "help";             // Справка по командам со списком пользователей.
         public const string List = "list";  // Вывод всех пользователей
         public const string ActiveUsersList = "active";  // Вывод залогиненных пользователей
@@ -20,7 +19,19 @@ namespace Commands
         public const string Remove = "remove";  // Скрытие пользователя и запрет ему на работу (запись не удаляется)
         public const string RMRF = "rmrf";  // Удаление пользователя из БД.
 
-        public static void Execute(Socket handler, User CurUser, DB DataBase, string[] Command, string[] Params)
+        public Users(DB dataBase) : base(dataBase)
+        {
+            Name = "users";           // Название корневой команды
+        }
+
+        /// <summary>
+        /// Реализация подкоманд
+        /// </summary>
+        /// <param name="handler"></param>
+        /// <param name="CurUser"></param>
+        /// <param name="Command"></param>
+        /// <param name="Params"></param>
+        public void Execute(Socket handler, User CurUser, string[] Command, string[] Params)
         {
             if (Command.Length == 1)
             {
@@ -31,17 +42,17 @@ namespace Commands
             switch (Command[1].ToLower())
             {
                 case Help: SendHelp(handler); break;
-                case List: ShowUsersList(handler, CurUser, DataBase, Params); break;
-                case ActiveUsersList: ShowActiveUsersList(handler, CurUser, DataBase, Params); break;
-                case Add: AddUser(handler, CurUser, DataBase, Params); break;
-                case Update: UpdateUser(handler, CurUser, DataBase, Params); break;
-                case Remove: RemoveUser(handler, CurUser, DataBase, Params); break;
-                case RMRF: RMRFUser(handler, CurUser, DataBase, Params); break;
+                case List: ShowUsersList(handler, CurUser, Params); break;
+                case ActiveUsersList: ShowActiveUsersList(handler, CurUser, Params); break;
+                case Add: AddUser(handler, CurUser, Params); break;
+                case Update: UpdateUser(handler, CurUser, Params); break;
+                case Remove: RemoveUser(handler, CurUser, Params); break;
+                case RMRF: RMRFUser(handler, CurUser, Params); break;
                 default: SimpleMsg(handler, "Unknown command"); break;
             }
         }
 
-        private static void SendHelp(Socket handler)
+        private void SendHelp(Socket handler)
         {
             SimpleMsg(handler, @"List of users. Helps to manage user list. Possible comands:
  - users.list - shows all users;
@@ -52,8 +63,13 @@ namespace Commands
  - users.rmrf - delete the user's record. Irreversable.");
         }
 
-        //Показать список пользователей
-        static void ShowUsersList(Socket handler, User CurUser, DB DataBase, string[] Params)
+        /// <summary>
+        /// Показать список пользователей
+        /// </summary>
+        /// <param name="handler"></param>
+        /// <param name="CurUser"></param>
+        /// <param name="Params"></param>
+        private void ShowUsersList(Socket handler, User CurUser, string[] Params)
         {
             // Взять всё из журнала и...
             string Query = @"SELECT `persons`.`id`, `Surname`, `persons`.`name`, `fathers_name`, `laboratory`.`abbr`, `job`, `Permissions`, `login`  
@@ -146,11 +162,20 @@ Parameters may be combined.");
             SendMsg(handler, Answer.EndMsg);
         }
 
-        // Показать список активных пользователей
-        static void ShowActiveUsersList(Socket handler, User CurUser, DB DataBase, string[] Params)
+        /// <summary>
+        ///  Показать список активных пользователей
+        /// </summary>
+        /// <param name="handler"></param>
+        /// <param name="CurUser"></param>
+        /// <param name="Params"></param>
+        private void ShowActiveUsersList(Socket handler, User CurUser, string[] Params)
         {
             // Если не админ, то ничего не покажем!
-            if (!ConsoleServer.Program.IsAdmin(handler, CurUser)) return;
+            if (!CurUser.IsAdmin())
+            {
+                SimpleMsg(handler, "Access denied! You should have admin privelegies");
+                return;
+            }
 
             SendMsg(handler, Answer.StartMsg);
             foreach (User U in ConsoleServer.Program.Active_Users)
@@ -172,8 +197,13 @@ Parameters may be combined.");
             SendMsg(handler, Answer.EndMsg);
         }
 
-        // Добавить нового пользователя через командную строку
-        static void AddUser(Socket handler, User CurUser, DB DataBase, string[] Params)
+        /// <summary>
+        ///  Добавить нового пользователя через командную строку
+        /// </summary>
+        /// <param name="handler"></param>
+        /// <param name="CurUser"></param>
+        /// <param name="Params"></param>
+        private void AddUser(Socket handler, User CurUser, string[] Params)
         {
             // Если не админ и не менеджер, то ничего не покажем!
             if (!CurUser.GetUserAddRermissions())
@@ -292,8 +322,13 @@ or
 
         }
 
-        // Изменить данные пользователя через командную строку
-        static void UpdateUser(Socket handler, User CurUser, DB DataBase, string[] Params)
+        /// <summary>
+        ///  Изменить данные пользователя через командную строку
+        /// </summary>
+        /// <param name="handler"></param>
+        /// <param name="CurUser"></param>
+        /// <param name="Params"></param>
+        private void UpdateUser(Socket handler, User CurUser, string[] Params)
         {
             // Если не админ и не менеджер, то ничего не покажем!
             if (!CurUser.GetUserAddRermissions())
@@ -440,8 +475,13 @@ or
 
         }
 
-        // Делаем пользователя неактивным
-        private static void RemoveUser(Socket handler, User CurUser, DB DataBase, string[] Params)
+        /// <summary>
+        ///  Делаем пользователя неактивным
+        /// </summary>
+        /// <param name="handler"></param>
+        /// <param name="CurUser"></param>
+        /// <param name="Params"></param>
+        private void RemoveUser(Socket handler, User CurUser, string[] Params)
         {
             // Если не админ и не менеджер, то ничего не покажем!
             if (!CurUser.GetUserAddRermissions())
@@ -481,17 +521,22 @@ or
         }
 
         
-        private static void Users_Remove_Help(Socket handler)
+        private void Users_Remove_Help(Socket handler)
         {
             SendMsg(handler, Commands.Answer.StartMsg);
             SendMsg(handler, @"Command to remove user from the system. Reversible. Safe. Parameters may include:
  - login [login] - login of user to remove.");
             SendMsg(handler, Commands.Answer.EndMsg);
         }
-        
-        
-        // Полностью удаляет пользователя из базы. Не рекомендуется
-        private static void RMRFUser(Socket handler, User CurUser, DB DataBase, string[] Params)
+
+
+        /// <summary>
+        ///  Полностью удаляет пользователя из базы. Не рекомендуется
+        /// </summary>
+        /// <param name="handler"></param>
+        /// <param name="CurUser"></param>
+        /// <param name="Params"></param>
+        private void RMRFUser(Socket handler, User CurUser, string[] Params)
         {
             // Если не админ, то ничего не покажем!
             if (!CurUser.IsAdmin())

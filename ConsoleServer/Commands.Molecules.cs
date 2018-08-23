@@ -11,15 +11,26 @@ using Extentions;
 
 namespace Commands
 {
-    class Molecules : ExecutableCommand
+    class Molecules : ExecutableCommand, IStandartCommand
     {
         // Команды по молекулам
-        public const string Name = "molecules";             // Название
         public const string Help = "help";                  // Подсказка
         public const string Add = "add";                    // Добавление молекулы
         public const string Search = "search";              // Поиск по молекулам
 
-        public static void Execute(Socket handler, User CurUser, DB DataBase, string[] Command, string[] Params)
+        public Molecules(DB dataBase) : base(dataBase)
+        {
+            Name = "molecules";             // Название
+        }
+
+        /// <summary>
+        /// Реализация подкоманд
+        /// </summary>
+        /// <param name="handler"></param>
+        /// <param name="CurUser"></param>
+        /// <param name="Command"></param>
+        /// <param name="Params"></param>
+        public void Execute(Socket handler, User CurUser, string[] Command, string[] Params)
         {
             if (Command.Length == 1)
             {
@@ -30,8 +41,8 @@ namespace Commands
             switch (Command[1].ToLower())
             {
                 case Help: SendHelp(handler); break;
-                case Add: AddMolecule(handler, CurUser, DataBase, Params); break;
-                case Search: SearchMoleculesBySMILES(handler, CurUser, DataBase, Params); break;
+                case Add: AddMolecule(handler, CurUser, Params); break;
+                case Search: SearchMoleculesBySMILES(handler, CurUser, Params); break;
                 default: SimpleMsg(handler, "Unknown command"); break;
             }
         }
@@ -43,7 +54,7 @@ namespace Commands
         /// <param name="CurUser"></param>
         /// <param name="DataBase"></param>
         /// <param name="Params"></param>
-        private static void AddMolecule(Socket handler, User CurUser, DB DataBase, string[] Params)
+        private void AddMolecule(Socket handler, User CurUser, string[] Params)
         {
             // Начальная инициация переменных, чтобы из IF(){} вышли
             string Subst = "";
@@ -123,7 +134,7 @@ VALUES (@Name, @Laboratory, @Person, @Structure, @State, @MeltingPoint, @Conditi
         /// Показывает справку о команде
         /// </summary>
         /// <param name="handler"></param>
-        private static void SendHelp(Socket handler)
+        private void SendHelp(Socket handler)
         {
             SimpleMsg(handler, @"List of molecules. The main interface to work with molecules. Possible comands:
  - molecules.add - Adds new molecule
@@ -137,7 +148,7 @@ VALUES (@Name, @Laboratory, @Person, @Structure, @State, @MeltingPoint, @Conditi
         /// <param name="CurUser"></param>
         /// <param name="DataBase"></param>
         /// <param name="Params"></param>
-        private static void SearchMoleculesBySMILES(Socket handler, User CurUser, DB DataBase, string[] Params)
+        private void SearchMoleculesBySMILES(Socket handler, User CurUser, string[] Params)
         {
             string Structure = "";
             string UserID = "";
@@ -164,7 +175,7 @@ VALUES (@Name, @Laboratory, @Person, @Structure, @State, @MeltingPoint, @Conditi
             }
             
             // Запрашиваем поиск по БД
-            List<string> Result = Get_Mol(DataBase, CurUser, Structure, SearchAria, Status.ToInt(), UserID);
+            List<string> Result = Get_Mol(CurUser, Structure, SearchAria, Status.ToInt(), UserID);
 
             // Отправляем ответ клиенту
             SendMsg(handler, Answer.StartMsg);
@@ -186,7 +197,7 @@ VALUES (@Name, @Laboratory, @Person, @Structure, @State, @MeltingPoint, @Conditi
         /// <param name="Status"></param>
         /// <param name="UserID"></param>
         /// <returns></returns>
-        static List<string> Get_Mol(DB DataBase, User CurUser, string Sub_Mol = "", 
+        private List<string> Get_Mol(User CurUser, string Sub_Mol = "", 
             string Request = "Permission", int Status = 0, string UserID=null)
         {
             //Создаём новые объекты
@@ -205,7 +216,7 @@ VALUES (@Name, @Laboratory, @Person, @Structure, @State, @MeltingPoint, @Conditi
             if (Sub_Mol == "")
             {
                 for (int i = 0; i < dt.Rows.Count; i++)
-                    Result.Add(DataRow_To_Molecule_Transport(DataBase, dt, i).ToXML());
+                    Result.Add(DataRow_To_Molecule_Transport(dt, i).ToXML());
 
             }
 
@@ -218,7 +229,7 @@ VALUES (@Name, @Laboratory, @Person, @Structure, @State, @MeltingPoint, @Conditi
                     string Structure = Program.CommonAES.DecryptStringFromBytes(dt.Rows[i].ItemArray[4] as byte[]);
 
                     if (CheckMol(Sub_Mol, Structure))
-                        Result.Add(DataRow_To_Molecule_Transport(DataBase, dt, i).ToXML());
+                        Result.Add(DataRow_To_Molecule_Transport(dt, i).ToXML());
                 };
             }
 
@@ -232,7 +243,7 @@ VALUES (@Name, @Laboratory, @Person, @Structure, @State, @MeltingPoint, @Conditi
         /// <param name="Mol"></param>
         /// <param name="DB_Mol"></param>
         /// <returns></returns>
-        static bool CheckMol(string Mol, string DB_Mol)
+        private bool CheckMol(string Mol, string DB_Mol)
         {
             // Создаём объекты OpenBabel
             OBSmartsPattern SP = new OBSmartsPattern();
@@ -263,7 +274,7 @@ VALUES (@Name, @Laboratory, @Person, @Structure, @State, @MeltingPoint, @Conditi
         /// <param name="dt"></param>
         /// <param name="i"></param>
         /// <returns></returns>
-        private static Molecule_Transport DataRow_To_Molecule_Transport(DB DataBase, DataTable dt, int i)
+        private Molecule_Transport DataRow_To_Molecule_Transport(DataTable dt, int i)
         {
             /*
                                 Структура данных: (-> - Открытый, => - закодированный)
@@ -295,11 +306,11 @@ VALUES (@Name, @Laboratory, @Person, @Structure, @State, @MeltingPoint, @Conditi
             MT.Name = FromBase(dt, i, 1);
             MT.Laboratory = new laboratory();
             MT.Laboratory.ID = Convert.ToInt32(FromBase(dt, i, 2));
-            List<string> Lab = GetRows(DataBase, "SELECT `name`, `abbr` FROM `laboratory` WHERE `id`=" +
+            List<string> Lab = GetRows("SELECT `name`, `abbr` FROM `laboratory` WHERE `id`=" +
                 dt.Rows[i].ItemArray[2].ToString() + " LIMIT 1");
             MT.Laboratory.Name = Lab[0];
             MT.Laboratory.Abb = Lab[1];
-            List<string> Per = GetRows(DataBase, @"SELECT `name`, `fathers_name`, `Surname`, `job` 
+            List<string> Per = GetRows(@"SELECT `name`, `fathers_name`, `Surname`, `job` 
                         FROM `persons` 
                         WHERE `id`= " + dt.Rows[i].ItemArray[3].ToString() + @"
                         LIMIT 1");
@@ -317,7 +328,7 @@ VALUES (@Name, @Laboratory, @Person, @Structure, @State, @MeltingPoint, @Conditi
             MT.Mass = FromBaseDecrypt(dt, i, 9);
             MT.Solution = FromBaseDecrypt(dt, i, 10);
             MT.Status = Convert.ToInt32(FromBase(dt, i, 11));
-            MT.Analysis = GetRows(DataBase, @"SELECT `analys`.`name`, `analys`.`name_whom` 
+            MT.Analysis = GetRows(@"SELECT `analys`.`name`, `analys`.`name_whom` 
                         FROM `analys` 
                           INNER JOIN `analys_to_molecules` ON `analys_to_molecules`.`analys` = `analys`.`id`
                         WHERE `analys_to_molecules`.`molecule` = " + dt.Rows[i].ItemArray[0].ToString() + ";");
@@ -349,7 +360,7 @@ VALUES (@Name, @Laboratory, @Person, @Structure, @State, @MeltingPoint, @Conditi
         /// <param name="DataBase"></param>
         /// <param name="Query"></param>
         /// <returns></returns>
-        static List<string> GetRows(DB DataBase, string Query)
+        private List<string> GetRows(string Query)
         {
             List<string> Result = new List<string>();
 
@@ -385,7 +396,7 @@ VALUES (@Name, @Laboratory, @Person, @Structure, @State, @MeltingPoint, @Conditi
         /// <param name="i"></param>
         /// <param name="j"></param>
         /// <returns></returns>
-        static string FromBase(DataTable dt, int i, int j)
+        private string FromBase(DataTable dt, int i, int j)
         {
             return NotNull(dt.Rows[i].ItemArray[j].ToString().Trim("\n"[0]));
         }
@@ -397,13 +408,13 @@ VALUES (@Name, @Laboratory, @Person, @Structure, @State, @MeltingPoint, @Conditi
         /// <param name="i"></param>
         /// <param name="j"></param>
         /// <returns></returns>
-        static string FromBaseDecrypt(DataTable dt, int i, int j)
+        private string FromBaseDecrypt(DataTable dt, int i, int j)
         {
             return NotNull(ConsoleServer.Program.CommonAES.DecryptStringFromBytes(
                 dt.Rows[i].ItemArray[j] as byte[])).Trim(new char[] { "\n"[0], ' ' });
         }
 
-        static string NotNull(string Text)
+        private string NotNull(string Text)
         {
             return Text != "" ? Text : "<@None@>";
         }

@@ -5,17 +5,29 @@ using System.Net.Sockets;
 
 namespace Commands
 {
-    class Laboratories : ExecutableCommand
+    class Laboratories : ExecutableCommand, IStandartCommand
     {
         // Команды по лабораториям
-        public const string Name = "laboratories";           // Название корневой команды
         public const string Help = "help";                   // справка по командам laboratories
         public const string Add = "add";                    // Добавление новой лаборатории
         public const string Edit = "update";                 // Изменение лаборатории
         public const string List = "list";                   // Вывод лабораторий на консоль
         public const string Names = "names";                  // Вывод ID и имён лабораторий 
 
-        public static void Execute(Socket handler, User CurUser, DB DataBase, string[] Command, string[] Params)
+        public Laboratories(DB dataBase) : base(dataBase)
+        {
+            Name = "laboratories";
+        }
+
+        /// <summary>
+        /// Выполнение операций классом. 
+        /// </summary>
+        /// <param name="handler">Сокет, через который посылается ответ</param>
+        /// <param name="CurUser">Пользователь</param>
+        /// <param name="DataBase">База данных, из которой берётся информация</param>
+        /// <param name="Command">Операция для выполнения</param>
+        /// <param name="Params">Параметры операции</param>
+        public void Execute(Socket handler, User CurUser, string[] Command, string[] Params)
         {
             if (Command.Length == 1)
             {
@@ -26,15 +38,15 @@ namespace Commands
             switch (Command[1].ToLower())
             {
                 case Help: SendHelp(handler); break;
-                case Add: AddLaboratory(handler, CurUser, DataBase, Params); break;
-                case Edit: UpdateLaboratory(handler, CurUser, DataBase, Params); break;
-                case List: ListShow(handler, CurUser, DataBase, Params); break;
-                case Names: NamesShow(handler, CurUser, DataBase, Params); break;
+                case Add: AddLaboratory(handler, CurUser, Params); break;
+                case Edit: UpdateLaboratory(handler, CurUser, Params); break;
+                case List: ListShow(handler, CurUser, Params); break;
+                case Names: NamesShow(handler, CurUser, Params); break;
                 default: SimpleMsg(handler, "Unknown command"); break;
             }
         }
 
-        private static void SendHelp(Socket handler)
+        private void SendHelp(Socket handler)
         {
             SimpleMsg(handler, @"List of laboratories. Helps to manage it. Possible comands:
  - users.list - shows all users;
@@ -43,7 +55,7 @@ namespace Commands
  - users.names - Shows list of IDs and Names of laboratories.");
         }
 
-        private static void AddLaboratory(Socket handler, User CurUser, DB DataBase, string[] Params)
+        private void AddLaboratory(Socket handler, User CurUser, string[] Params)
         {
             // Если не админ и не менеджер, то ничего не покажем!
             if (!CurUser.GetUserAddRermissions())
@@ -92,7 +104,7 @@ namespace Commands
             SimpleMsg(handler, "Laboratory added successfully");
         }
 
-        private static void UpdateLaboratory(Socket handler, User CurUser, DB DataBase, string[] Params)
+        private void UpdateLaboratory(Socket handler, User CurUser, string[] Params)
         {
             // Если не админ и не менеджер, то ничего не покажем!
             if (!CurUser.GetUserAddRermissions())
@@ -157,7 +169,7 @@ namespace Commands
             SimpleMsg(handler, "Laboratory updated successfully");
         }
 
-        private static void ListShow(Socket handler, User CurUser, DB DataBase, string[] Params)
+        private void ListShow(Socket handler, User CurUser, string[] Params)
         {
             // Взять всё из журнала и...
             string Query = @"SELECT `id`, `abbr`, `name` FROM `laboratory`";
@@ -242,7 +254,7 @@ namespace Commands
 
         }
 
-        private static void NamesShow(Socket handler, User CurUser, DB DataBase, string[] Params)
+        private void NamesShow(Socket handler, User CurUser, string[] Params)
         {
             // Запросим список лабораторий
             string Query = @"SELECT `id`, `name` FROM `laboratory`";

@@ -46,9 +46,7 @@
     <Reference Include="System.Core" />
     <Reference Include="System.Xml.Linq" />
     <Reference Include="System.Data.DataSetExtensions" />
-    <Reference Include="Microsoft.CSharp" />
     <Reference Include="System.Data" />
-    <Reference Include="System.Net.Http" />
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
@@ -56,9 +54,12 @@
     <Compile Include="Commands.Account.cs" />
     <Compile Include="Commands.cs" />
     <Compile Include="Commands.Database.cs" />
+    <Compile Include="Commands.FileDB.cs" />
+    <Compile Include="Commands.Global.cs" />
     <Compile Include="Commands.Laboratories.cs" />
     <Compile Include="Commands.Log.cs" />
     <Compile Include="Commands.Molecules.cs" />
+    <Compile Include="Commands.Status.cs" />
     <Compile Include="Commands.User.cs" />
     <Compile Include="DB.cs" />
     <Compile Include="Files.cs" />

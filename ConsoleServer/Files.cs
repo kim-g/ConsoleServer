@@ -92,5 +92,19 @@ SELECT LAST_INSERT_ID(); ";
 
             return new Files(FileName, FileName, data);
         }
+
+        /// <summary>
+        /// Выдаёт имя файла из БД по его ID
+        /// </summary>
+        /// <param name="DataBase">База данных</param>
+        /// <param name="ID">Номер файла</param>
+        /// <returns></returns>
+        public static string FileNameByID(DB DataBase, int ID)
+        {
+            DataTable NewFile = DataBase.Query(@"SELECT `file_name` FROM files WHERE `id`=" +
+                            ID + @" LIMIT 1;");
+            if (NewFile.Rows.Count == 0) { return "Файл отсутствует"; }
+            return NewFile.Rows[0].ItemArray[0].ToString(); 
+        }
     }
 }

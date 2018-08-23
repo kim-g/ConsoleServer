@@ -8,10 +8,23 @@ using System.Data;
 
 namespace Commands
 {
-
-    class ExecutableCommand
+    /// <summary>
+    /// Абстрактный класс, позволяющий обрабатывать блоки команд
+    /// </summary>
+    abstract class ExecutableCommand
     {
-        // Посылает сообщение с открывающей и закрывающей командами
+        public DB DataBase { get; set; }
+        public string Name;               // Название
+        public ExecutableCommand(DB dataBase)
+        {
+            DataBase = dataBase;
+        }
+
+        /// <summary>
+        /// Посылает сообщение с открывающей и закрывающей командами
+        /// </summary>
+        /// <param name="handler">Сокет, через который отправляется сообщение</param>
+        /// <param name="Message">Текст сообщения</param>
         public static void SimpleMsg(Socket handler, string Message)
         {
             SendMsg(handler, Answer.StartMsg);
@@ -19,7 +32,11 @@ namespace Commands
             SendMsg(handler, Answer.EndMsg);
         }
 
-        // Очищает список параметров от мусора и соединяет в одну строку
+        /// <summary>
+        /// Очищает список параметров от мусора и соединяет в одну строку
+        /// </summary>
+        /// <param name="Param">Параметры</param>
+        /// <returns></returns>
         public static string AllParam(string[] Param)
         {
             string Text = Param[1].Replace("\n", "").Replace("\r", "");
@@ -32,16 +49,24 @@ namespace Commands
             return Text;
         }
 
-        // Выдаёт единственный параметр
+        /// <summary>
+        /// Выдаёт единственный параметр
+        /// </summary>
+        /// <param name="Param">Параметры</param>
+        /// <returns></returns>
         public static string SimpleParam(string[] Param)
         {
             return Param[1].Replace("\n", "").Replace("\r", "");
         }
 
-        // Вызывает внешниюю команду посылки сообщения
+        /// <summary>
+        /// Вызывает внешниюю команду посылки сообщения
+        /// </summary>
+        /// <param name="handler">Сокет, через который отправляется сообщение</param>
+        /// <param name="Msg">Текст сообщения</param>
         public static void SendMsg(Socket handler, string Msg)
         {
-            ConsoleServer.Program.SendMsg(handler, Msg);
+            Program.SendMsg(handler, Msg);
         }
 
         /// <summary>
@@ -55,28 +80,69 @@ namespace Commands
             if (Text.Length >= Length) return Text;
             return Text + new String(' ', Length - Text.Length);
         }
+
+        /// <summary>
+        /// Поиск элементов в БД
+        /// </summary>
+        /// <param name="Query"></param>
+        /// <returns></returns>
+        protected List<string> GetRows(string Query)
+        {
+            List<string> Result = new List<string>();
+
+            // Получение данных из БД по запросу
+            DataTable DT = DataBase.Query(Query);
+
+            if (DT.Rows.Count > 0)  // Выводим результат
+            {
+                for (int i = 0; i < DT.Rows.Count; i++)
+                {
+                    for (int j = 0; j < DT.Columns.Count; j++)
+                    {
+                        Result.Add(NotNull(DT.Rows[i].ItemArray[j].ToString().Trim("\n"[0])));
+                    }
+                }
+
+            }
+            else
+            {
+                for (int j = 1; j < DT.Columns.Count; j++)
+                {
+                    Result.Add("ERROR 2 – Data not found");
+                }
+            }
+
+            return Result;
+        }
+
+        protected string NotNull(string Text) => Text != "" ? Text : "<@None@>";
+
+        protected string NotNullSQL(string Text) => Text != "" ? Text : "NULL";
     }
 
-    class Global
+    interface IStandartCommand
     {
-        //Команды от клиента в нулевой строке (Часть устаревшие. Сохранены для совместимости.)
-        public const string Search_Mol = "<@Search_Molecule@>";
-        public const string Add_User = "<@Add_User@>";
-        public const string Add_Mol = "<@Add_Molecule@>";
-        public const string Login = "<@Login_User@>";
-        public const string Status = "<@Next_Status@>";
-        public const string GetStatuses = "<@Get_Status_List@>";
-        public const string QuitMsg = "<@*Quit*@>";
-        public const string FN_msg = "<@GetFileName@>";
-        public const string Show_My_mol = "<@Show my molecules@>";  // Команда показать все молекулы
-        public const string Increase_Status = "<@Increase status@>"; // Увеличеть значение статуса соединения
-        public const string Show_New_Mol = "<@Show new molecules@>";  // Команда показать все молекулы новые
-        public const string SendFileMsg = "<@*Send_File*@>";
-        public const string GetFileMsg = "<@*Get_File*@>";
-        public const string All_Users = "<@Show_All_Users@>";
-        public const string ShowHash = "<@Show_Hash@>";
+        /// <summary>
+        /// Выполняет поиск подкоманды и обеспечивает её реализацию
+        /// </summary>
+        /// <param name="handler"></param>
+        /// <param name="CurUser"></param>
+        /// <param name="Command"></param>
+        /// <param name="Params"></param>
+        void Execute(Socket handler, User CurUser, string[] Command, string[] Params);
+    }
 
-        public const string Help = "help";      // Справка по консоли администратора
+    interface IUserListCommand
+    {
+        /// <summary>
+        /// Выполняет поиск подкоманды и обеспечивает её реализацию
+        /// </summary>
+        /// <param name="handler"></param>
+        /// <param name="CurUser"></param>
+        /// <param name="Command"></param>
+        /// <param name="Params"></param>
+        void Execute(Socket handler, User CurUser, string[] Command,
+            string[] Params, List<User> ActiveUsers, int LogID);
     }
 
     class Answer
@@ -86,8 +152,6 @@ namespace Commands
         public const string LoginExp = "<@Login_Expired@>";
         public const string StartMsg = "<@Begin_Of_Session@>";
         public const string EndMsg = "<@End_Of_Session@>";
-        public const string Answer_Admin = "AdminOK";
-        public const string Answer_Manager = "ManagerOK";
     }
 
 

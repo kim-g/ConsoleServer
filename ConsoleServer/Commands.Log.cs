@@ -12,13 +12,17 @@ namespace Commands
     /// <summary>
     /// Взаимодействие с журналом операций
     /// </summary>
-    class Log : ExecutableCommand
+    class Log : ExecutableCommand, IStandartCommand
     {
-        // Команды по молекулам
-        public const string Name = "log";               // Название
+        // Команды по журналам
         public const string Help = "help";              // Справка по использованию журнала
         public const string Session = "sessions";       // Показать список сессий
         public const string Query = "queries";          // Показать список запросов.
+
+        public Log(DB dataBase) : base(dataBase)
+        {
+            Name = "log";               // Название
+        }
 
         /// <summary>
         /// Выполнение операций классом. 
@@ -28,7 +32,7 @@ namespace Commands
         /// <param name="DataBase">База данных, из которой берётся информация</param>
         /// <param name="Command">Операция для выполнения</param>
         /// <param name="Params">Параметры операции</param>
-        public static void Execute(Socket handler, User CurUser, DB DataBase, string[] Command, string[] Params)
+        public void Execute(Socket handler, User CurUser, string[] Command, string[] Params)
         {
             if (Command.Length == 1)
             {
@@ -39,8 +43,8 @@ namespace Commands
             switch (Command[1].ToLower())
             {
                 case Help: SendHelp(handler); break;
-                case Session: SHowSessions(handler, CurUser, DataBase, Params); break;
-                case Query: ShowQueries(handler, CurUser, DataBase, Params); break;
+                case Session: ShowSessions(handler, CurUser, Params); break;
+                case Query: ShowQueries(handler, CurUser, Params); break;
                 default: SimpleMsg(handler, "Unknown command"); break;
             }
         }
@@ -49,7 +53,7 @@ namespace Commands
         /// Показывает справку о команде
         /// </summary>
         /// <param name="handler"></param>
-        private static void SendHelp(Socket handler) => SimpleMsg(handler, @"System logs. Shows informations aboute program usage. Possible comands:
+        private void SendHelp(Socket handler) => SimpleMsg(handler, @"System logs. Shows informations aboute program usage. Possible comands:
  - log.sessions - shows sessions history
  - log.queries - shows query history.");
 
@@ -60,7 +64,7 @@ namespace Commands
         /// <param name="curUser"></param>
         /// <param name="dataBase"></param>
         /// <param name="params"></param>
-        private static void ShowQueries(Socket handler, User CurUser, DB DataBase, string[] Params)
+        private void ShowQueries(Socket handler, User CurUser, string[] Params)
         {
             // Если не админ, то ничего не покажем!
             if (!CurUser.IsAdmin()) return;
@@ -199,7 +203,7 @@ Parameters may be combined.");
         /// <param name="curUser"></param>
         /// <param name="dataBase"></param>
         /// <param name="params"></param>
-        private static void SHowSessions(Socket handler, User CurUser, DB DataBase, string[] Params)
+        private void ShowSessions(Socket handler, User CurUser, string[] Params)
         {
             // Если не админ, то ничего не покажем!
             if (!CurUser.IsAdmin()) return;
@@ -346,7 +350,7 @@ Parameters may be combined.");
         /// <param name="Command"></param>
         /// <param name="Params"></param>
         /// <returns></returns>
-        public static int SaveQuery(Socket handler, DB DataBase, User CurUser, string Command, string Params)
+        public int SaveQuery(Socket handler, User CurUser, string Command, string Params)
         {
             string LogQuery = Command.Trim() != Account.LoginAll
                         ? @"INSERT INTO `queries` (`user`, `session`,`ip`,`command`,`parameters`) 
@@ -366,7 +370,7 @@ Parameters may be combined.");
         /// <param name="DataBase">БД</param>
         /// <param name="LogID">Номер строки</param>
         /// <param name="Comment">Текст комментария</param>
-        public static void AddToQueryLog(DB DataBase, int LogID, string Comment)
+        public void AddToQueryLog(int LogID, string Comment)
         {
             DataBase.ExecuteQuery("UPDATE `queries` SET `comment` = '" + Comment + "' " +
                                         "WHERE `id` = " + LogID.ToString() + ";");

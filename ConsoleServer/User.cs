@@ -84,7 +84,7 @@ namespace ConsoleServer
             DataBase.Query("INSERT INTO `sessions` (`user`, `ip`) VALUES (" + DT.Rows[0].ItemArray[0] as string + 
                 ", '" + _IP + "')");
 
-            SessionID = Program.GetLastID(DataBase);
+            SessionID = DataBase.GetLastID();
 
             Random Rnd = new Random();
             for (int i = 0; i<20; i++)

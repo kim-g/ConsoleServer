@@ -172,7 +172,6 @@ namespace ConsoleServer
                         if (Command[0].ToLower() == Block.To<Commands.ExecutableCommand>().Name)
                         {
                             Block.Execute(handler, CurUser, Command, GetParameters(data_parse));
-                            FinishConnection(handler);
                             continue;
                         }
                     }
@@ -184,7 +183,6 @@ namespace ConsoleServer
                         {
                             Block.Execute(handler, CurUser, Command, GetParameters(data_parse), 
                                 Active_Users, LogID);
-                            FinishConnection(handler);
                             continue;
                         }
                     }

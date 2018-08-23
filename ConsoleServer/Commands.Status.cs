@@ -12,12 +12,12 @@ namespace Commands
     class Status : ExecutableCommand, IStandartCommand
     {
         public const string Help = "help";              // Справка по использованию журнала
-        public const string GetStatuses = "status.list";
-        public const string Increase_Status = "status.increase"; // Увеличеть значение статуса соединения
+        public const string GetStatuses = "list";
+        public const string Increase_Status = "increase"; // Увеличеть значение статуса соединения
 
         public Status(DB dataBase) : base(dataBase)
         {
-            Name = "";
+            Name = "status";
         }
 
         /// <summary>
@@ -30,13 +30,13 @@ namespace Commands
         /// <param name="Params">Параметры операции</param>
         public void Execute(Socket handler, User CurUser, string[] Command, string[] Params)
         {
-            if (Command[0].Length == 0)
+            if (Command.Length == 1)
             {
                 SendHelp(handler);
                 return;
             }
 
-            switch (Command[0].ToLower())
+            switch (Command[1].ToLower())
             {
                 case Help: SendHelp(handler); break;
                 case GetStatuses: SendStatusList(handler); break;

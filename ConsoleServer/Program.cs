@@ -10,6 +10,7 @@ using System.Net;
 using System.Net.Sockets;
 using MySql.Data.MySqlClient;
 using Extentions;
+using System.Threading.Tasks;
 
 namespace ConsoleServer
 {
@@ -65,7 +66,6 @@ namespace ConsoleServer
                 new Commands.Account(DataBase),
                 new Commands.Database(DataBase),
                 new Commands.FileEngine(DataBase),
-                new Commands.Global(DataBase),
                 new Commands.Laboratories(DataBase),
                 new Commands.Log(DataBase),
                 new Commands.Molecules(DataBase),
@@ -100,100 +100,11 @@ namespace ConsoleServer
                 // Начинаем слушать соединения
                 while (true)
                 {
-                    Console.WriteLine("Ожидаем соединение через порт {0}", ipEndPoint);
+                    Console.WriteLine($"Ожидаем соединение через порт {ipEndPoint}" );
 
                     // Программа приостанавливается, ожидая входящее соединение
                     Socket handler = sListener.Accept();
-                    string data = null;
-
-                    // Мы дождались клиента, пытающегося с нами соединиться
-
-                    // Получаем длину текстового сообщения
-                    byte[] SL_Length_b = new byte[4];
-                    handler.Receive(SL_Length_b);
-                    int SL_Length = BitConverter.ToInt32(SL_Length_b, 0);
-
-                    // Получаем текстовую часть сообщения
-                    byte[] bytes = new byte[SL_Length];
-                    int bytesRec = handler.Receive(bytes);
-
-                    data += Encoding.UTF8.GetString(bytes, 0, bytesRec);
-
-                    string[] data_parse = data.Split("\n"[0]);
-
-                    // Показываем данные на консоли
-                    Console.Write("Полученный текст: «" + data + "»\n\n");
-
-                    // Очистка ото всех уже не активных пользователей, которые почему-то не удалены из списка активных
-                    Active_Users.RemoveAll(x => x.Dead());
-
-                    // Ищем пользователя по его логину и защитной записи.
-                    // Если дана команда входа в систему, то поиск не производим.
-                    User CurUser = null;
-                    if (data_parse[0].Trim() != Commands.Account.LoginAll)
-                    {
-                        CurUser = GetCurUser(data_parse[1], data_parse[2]);
-                        if (CurUser == null)
-                        {
-                            SendMsg(handler, Commands.Answer.StartMsg);
-                            SendMsg(handler, Commands.Answer.LoginExp);
-                            SendMsg(handler, Commands.Answer.EndMsg);
-
-                            handler.Shutdown(SocketShutdown.Both);
-                            handler.Close();
-
-                            GC.Collect();
-                            continue;
-                        }
-                    }
-
-                    // Записываем в журнал команду.
-                    // Сохраняем все переданные параметры в одну строку через перенос каретки
-                    string Params = "";
-                    for (int i = 3; i < data_parse.Count(); i++)
-                    {
-                        if (i > 3) Params += "\n";
-                        if ((data_parse[0].Trim() == Commands.Account.LoginAll) && 
-                            (data_parse[i].StartsWith("password ")))
-                                Params += "*****";
-                        else Params += data_parse[i];
-                    }
-
-                    // И добавляем в лог
-                    int LogID = Log.SaveQuery(handler, CurUser, data_parse[0], Params);
-
-                    // Обработка классом Commands.
-
-                    string[] Command = data_parse[0].Split('.');
-
-                    // Выполним операцию, если команда требует стандартных параметров
-                    foreach (Commands.IStandartCommand Block in BaseCommands.OfType<Commands.IStandartCommand>())
-                    {
-                        if (Command[0].ToLower() == Block.To<Commands.ExecutableCommand>().Name)
-                        {
-                            Block.Execute(handler, CurUser, Command, GetParameters(data_parse));
-                            continue;
-                        }
-                    }
-
-                    // Выполним операцию, если команда требует расширенных параметров
-                    foreach (Commands.IUserListCommand Block in BaseCommands.OfType<Commands.IUserListCommand>())
-                    {
-                        if (Command[0].ToLower() == Block.To<Commands.ExecutableCommand>().Name)
-                        {
-                            Block.Execute(handler, CurUser, Command, GetParameters(data_parse), 
-                                Active_Users, LogID);
-                            continue;
-                        }
-                    }
-
-                    if (data.IndexOf("<TheEnd>") > -1)
-                    {
-                        Console.WriteLine("Сервер завершил соединение с клиентом.");
-                        break;
-                    }
-
-                    FinishConnection(handler);
+                    Task NewCommandRun = Task.Run(() => RunCommand(handler, BaseCommands, Log));
                 }
             }
             catch (Exception ex)
@@ -285,6 +196,106 @@ namespace ConsoleServer
             SendMsg(handler, Commands.Answer.StartMsg);
             SendMsg(handler, Message);
             SendMsg(handler, Commands.Answer.EndMsg);
+        }
+
+        /// <summary>
+        /// Обработка полученной команды. Производится в другом потоке для использования многоядерности
+        /// </summary>
+        /// <param name="handler">Сокет</param>
+        /// <param name="BaseCommands">Экземпляры команд</param>
+        /// <param name="Log">Журнал</param>
+        private static void RunCommand(Socket handler, List<Commands.ExecutableCommand> BaseCommands,
+            Commands.Log Log)
+        {
+            string data = null;
+            // Мы дождались клиента, пытающегося с нами соединиться
+
+            // Получаем длину текстового сообщения
+            byte[] SL_Length_b = new byte[4];
+            handler.Receive(SL_Length_b);
+            int SL_Length = BitConverter.ToInt32(SL_Length_b, 0);
+
+            // Получаем текстовую часть сообщения
+            byte[] bytes = new byte[SL_Length];
+            int bytesRec = handler.Receive(bytes);
+
+            data += Encoding.UTF8.GetString(bytes, 0, bytesRec);
+
+            string[] data_parse = data.Split("\n"[0]);
+
+            // Показываем данные на консоли
+            Console.Write($"Полученный текст: «{data}»\n\n");
+
+            // Очистка ото всех уже не активных пользователей, которые почему-то не удалены из списка активных
+            Active_Users.RemoveAll(x => x.Dead());
+
+            // Ищем пользователя по его логину и защитной записи.
+            // Если дана команда входа в систему, то поиск не производим.
+            User CurUser = null;
+            if (data_parse[0].Trim() != Commands.Account.LoginAll)
+            {
+                CurUser = GetCurUser(data_parse[1], data_parse[2]);
+                if (CurUser == null)
+                {
+                    SendMsg(handler, Commands.Answer.StartMsg);
+                    SendMsg(handler, Commands.Answer.LoginExp);
+                    SendMsg(handler, Commands.Answer.EndMsg);
+
+                    handler.Shutdown(SocketShutdown.Both);
+                    handler.Close();
+
+                    GC.Collect();
+                    return;
+                }
+            }
+
+            // Записываем в журнал команду.
+            // Сохраняем все переданные параметры в одну строку через перенос каретки
+            string Params = "";
+            for (int i = 3; i < data_parse.Count(); i++)
+            {
+                if (i > 3) Params += "\n";
+                if ((data_parse[0].Trim() == Commands.Account.LoginAll) &&
+                    (data_parse[i].StartsWith("password ")))
+                    Params += "*****";
+                else Params += data_parse[i];
+            }
+
+            // И добавляем в лог
+            int LogID = Log.SaveQuery(handler, CurUser, data_parse[0], Params);
+
+            // Обработка классом Commands.
+
+            string[] Command = data_parse[0].Split('.');
+            bool Executed = false;
+
+            // Выполним операцию, если команда требует стандартных параметров
+            foreach (Commands.IStandartCommand Block in BaseCommands.OfType<Commands.IStandartCommand>())
+            {
+                if (Command[0].ToLower() == Block.To<Commands.ExecutableCommand>().Name)
+                {
+                    Block.Execute(handler, CurUser, Command, GetParameters(data_parse));
+                    Executed = true;
+                    break;
+                }
+            }
+
+            // Выполним операцию, если команда требует расширенных параметров
+            foreach (Commands.IUserListCommand Block in BaseCommands.OfType<Commands.IUserListCommand>())
+            {
+                if (Command[0].ToLower() == Block.To<Commands.ExecutableCommand>().Name)
+                {
+                    Block.Execute(handler, CurUser, Command, GetParameters(data_parse),
+                        Active_Users, LogID);
+                    Executed = true;
+                    break;
+                }
+            }
+
+            if (!Executed) new Commands.Global(DataBase).Execute(handler, CurUser, Command,
+                GetParameters(data_parse), LogID);
+
+            FinishConnection(handler);
         }
     }
 }

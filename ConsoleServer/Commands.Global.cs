@@ -10,7 +10,7 @@ namespace Commands
     /// <summary>
     /// Различные команды, не относящиеся к общим классам, а также команды для дебаггинга
     /// </summary>
-    class Global : ExecutableCommand, IStandartCommand
+    class Global : ExecutableCommand, ILogCommand
     {
         public const string Help = "help";      // Справка по консоли администратора
 
@@ -27,7 +27,7 @@ namespace Commands
         /// <param name="DataBase">База данных, из которой берётся информация</param>
         /// <param name="Command">Операция для выполнения</param>
         /// <param name="Params">Параметры операции</param>
-        public void Execute(Socket handler, User CurUser, string[] Command, string[] Params)
+        public void Execute(Socket handler, User CurUser, string[] Command, string[] Params, int LogID)
         {
             if (Command[0].Length == 0)
             {
@@ -38,7 +38,10 @@ namespace Commands
             switch (Command[0].ToLower())
             {
                 case Help: SendHelp(handler); break;
-                default: SimpleMsg(handler, "Unknown command"); break;
+                default:
+                    Log.AddToQueryLog(DataBase, LogID, "! Unknown command");
+                    SimpleMsg(handler, "Error 1: Unknown command in line 0");
+                    break;
             }
         }
 

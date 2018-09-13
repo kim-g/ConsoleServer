@@ -367,10 +367,21 @@ Parameters may be combined.");
         /// <summary>
         /// Добавляет комментарий к строке в журнале
         /// </summary>
-        /// <param name="DataBase">БД</param>
         /// <param name="LogID">Номер строки</param>
         /// <param name="Comment">Текст комментария</param>
         public void AddToQueryLog(int LogID, string Comment)
+        {
+            DataBase.ExecuteQuery("UPDATE `queries` SET `comment` = '" + Comment + "' " +
+                                        "WHERE `id` = " + LogID.ToString() + ";");
+        }
+
+        /// <summary>
+        /// Добавляет комментарий к строке в журнале
+        /// </summary>
+        /// <param name="DataBase">БД</param>
+        /// <param name="LogID">Номер строки</param>
+        /// <param name="Comment">Текст комментария</param>
+        public static void AddToQueryLog(DB DataBase, int LogID, string Comment)
         {
             DataBase.ExecuteQuery("UPDATE `queries` SET `comment` = '" + Comment + "' " +
                                         "WHERE `id` = " + LogID.ToString() + ";");

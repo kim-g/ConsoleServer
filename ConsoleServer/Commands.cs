@@ -145,6 +145,19 @@ namespace Commands
             string[] Params, List<User> ActiveUsers, int LogID);
     }
 
+interface ILogCommand
+    {
+        /// <summary>
+        /// Выполняет поиск подкоманды и обеспечивает её реализацию
+        /// </summary>
+        /// <param name="handler"></param>
+        /// <param name="CurUser"></param>
+        /// <param name="Command"></param>
+        /// <param name="Params"></param>
+        void Execute(Socket handler, User CurUser, string[] Command,
+            string[] Params, int LogID);
+    }
+
     class Answer
     {
         // Ответные команды

@@ -36,16 +36,16 @@ namespace Commands
         {
             if (Command.Length == 1)
             {
-                SendHelp(handler);
+                SendHelp(handler, CurUser);
                 return;
             }
 
             switch (Command[1].ToLower())
             {
-                case Help: SendHelp(handler); break;
+                case Help: SendHelp(handler, CurUser); break;
                 case Session: ShowSessions(handler, CurUser, Params); break;
                 case Query: ShowQueries(handler, CurUser, Params); break;
-                default: SimpleMsg(handler, "Unknown command"); break;
+                default: CurUser.Transport.SimpleMsg(handler, "Unknown command"); break;
             }
         }
 
@@ -53,7 +53,7 @@ namespace Commands
         /// Показывает справку о команде
         /// </summary>
         /// <param name="handler"></param>
-        private void SendHelp(Socket handler) => SimpleMsg(handler, @"System logs. Shows informations aboute program usage. Possible comands:
+        private void SendHelp(Socket handler, User CurUser) => CurUser.Transport.SimpleMsg(handler, @"System logs. Shows informations aboute program usage. Possible comands:
  - log.sessions - shows sessions history
  - log.queries - shows query history.");
 
@@ -107,7 +107,7 @@ INNER JOIN persons ON(persons.id = queries.user)";
                 // Служебные
                 if (Param[0] == "help")     // Помощь
                 {
-                    SimpleMsg(handler, @"log.queries shows list of users' queries to server. All queries are logged. There are several filter parameters:
+                    CurUser.Transport.SimpleMsg(handler, @"log.queries shows list of users' queries to server. All queries are logged. There are several filter parameters:
 
  - person [login] - Show only person's queries;
  - date YYYY-MM-DD - Shows queries that were in this day;
@@ -170,9 +170,9 @@ Parameters may be combined.");
             DataTable Res = DataBase.Query(Query);
 
             // И пошлём всё пользователю.
-            SendMsg(handler, Commands.Answer.StartMsg);
-            SendMsg(handler, "| ID     | user            | session | IP              | Date                | Command (Parameters) – Comment");
-            SendMsg(handler, "|--------|-----------------|---------|-----------------|---------------------|-----------------------------------");
+            List<string> Out = new List<string>();
+            Out.Add("| ID     | user            | session | IP              | Date                | Command (Parameters) – Comment");
+            Out.Add("|--------|-----------------|---------|-----------------|---------------------|-----------------------------------");
 
             //Server Fail – quit date of restart
             if (Res.Rows.Count == 0) SendMsg(handler, "Results not found");
@@ -191,9 +191,9 @@ Parameters may be combined.");
                 msg += Res.Rows[i].ItemArray[5].ToString() + " (";
                 msg += Res.Rows[i].ItemArray[6].ToString().Replace('\n', ' ').Replace('\r', ';') + ") – ";
                 msg += Res.Rows[i].ItemArray[7].ToString() + "";
-                SendMsg(handler, msg);
+                Out.Add(msg);
             }
-            SendMsg(handler, Commands.Answer.EndMsg);
+            CurUser.Transport.SimpleMsg(handler, Out);
         }
 
         /// <summary>
@@ -247,7 +247,7 @@ INNER JOIN `persons` ON (`persons`.`id` = `sessions`.`user`)";
                 // Служебные
                 if (Param[0] == "help")     // Помощь
                 {
-                    SimpleMsg(handler, @"log.sessions shows list of sessions. There are several filter parameters:
+                    CurUser.Transport.SimpleMsg(handler, @"log.sessions shows list of sessions. There are several filter parameters:
 
  - person [login] - Show only person's sessions;
  - date YYYY-MM-DD - Shows sessions that started or ended in this day;
@@ -316,13 +316,12 @@ Parameters may be combined.");
             DataTable Res = DataBase.Query(Query);
 
             // И отошлём всё.
-            SendMsg(handler, Answer.StartMsg);
-            SendMsg(handler, Query);
-            SendMsg(handler, "| ID\t | Start date   time  \t | End   date   time  \t | User            | IP              | Reason");
-            SendMsg(handler, "|--------|-----------------------|-----------------------|-----------------|-----------------|-----------------------------------");
+            List<string> Out = new List<string>();
+            Out.Add("| ID\t | Start date   time  \t | End   date   time  \t | User            | IP              | Reason");
+            Out.Add("|--------|-----------------------|-----------------------|-----------------|-----------------|-----------------------------------");
 
             //Server Fail – quit date of restart
-            if (Res.Rows.Count == 0) SendMsg(handler, "Results not found");
+            if (Res.Rows.Count == 0) Out.Add("Results not found");
 
             for (int i = 0; i < Res.Rows.Count; i++)
             {
@@ -336,9 +335,9 @@ Parameters may be combined.");
                 msg += Res.Rows[i].ItemArray[4].ToString() +
                     new String(' ', 15 - Res.Rows[i].ItemArray[4].ToString().Length) + " | ";
                 msg += Res.Rows[i].ItemArray[5].ToString() + "\t";
-                SendMsg(handler, msg);
+                Out.Add(msg);
             }
-            SendMsg(handler, Answer.EndMsg);
+            CurUser.Transport.SimpleMsg(handler, Out);
         }
 
         /// <summary>

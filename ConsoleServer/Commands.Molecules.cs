@@ -34,16 +34,16 @@ namespace Commands
         {
             if (Command.Length == 1)
             {
-                SendHelp(handler);
+                SendHelp(handler, CurUser);
                 return;
             }
 
             switch (Command[1].ToLower())
             {
-                case Help: SendHelp(handler); break;
+                case Help: SendHelp(handler, CurUser); break;
                 case Add: AddMolecule(handler, CurUser, Params); break;
                 case Search: SearchMoleculesBySMILES(handler, CurUser, Params); break;
-                default: SimpleMsg(handler, "Unknown command"); break;
+                default: CurUser.Transport.SimpleMsg(handler, "Unknown command"); break;
             }
         }
 
@@ -84,7 +84,7 @@ namespace Commands
                     case "properties": Properties = SimpleParam(Param); break;
                     case "mass": Mass = SimpleParam(Param); break;
                     case "solution": Solution = SimpleParam(Param); break;
-                    case "help": SimpleMsg(handler, @"Command to add new molecule. Please, enter all information about the this. Parameters must include:
+                    case "help": CurUser.Transport.SimpleMsg(handler, @"Command to add new molecule. Please, enter all information about the this. Parameters must include:
  - code [Name] - Code of the substance.
  - laboratory [Code] - ID of owner's laboratory.
  - person [Code] - ID of owner.
@@ -99,13 +99,13 @@ namespace Commands
             }
 
             // Проверяем, все ли нужные данные есть
-            if (Subst == "") { SimpleMsg(handler, "Error: No code entered"); return; }
-            if (Lab == "") { SimpleMsg(handler, "Error: No laboratory entered"); return; }
-            if (Person == "") { SimpleMsg(handler, "Error: No person entered"); return; }
-            if (Structure == "") { SimpleMsg(handler, "Error: No structure entered"); return; }
-            if (PhysState == "") { SimpleMsg(handler, "Error: No physical state entered"); return; }
-            if (Mass == "") { SimpleMsg(handler, "Error: No mass entered"); return; }
-            if (Solution == "") { SimpleMsg(handler, "Error: No solution entered"); return; }
+            if (Subst == "") { CurUser.Transport.SimpleMsg(handler, "Error: No code entered"); return; }
+            if (Lab == "") { CurUser.Transport.SimpleMsg(handler, "Error: No laboratory entered"); return; }
+            if (Person == "") { CurUser.Transport.SimpleMsg(handler, "Error: No person entered"); return; }
+            if (Structure == "") { CurUser.Transport.SimpleMsg(handler, "Error: No structure entered"); return; }
+            if (PhysState == "") { CurUser.Transport.SimpleMsg(handler, "Error: No physical state entered"); return; }
+            if (Mass == "") { CurUser.Transport.SimpleMsg(handler, "Error: No mass entered"); return; }
+            if (Solution == "") { CurUser.Transport.SimpleMsg(handler, "Error: No solution entered"); return; }
 
             // Добавление и шифровка
             string queryString = @"INSERT INTO `molecules` 
@@ -127,16 +127,16 @@ VALUES (@Name, @Laboratory, @Person, @Structure, @State, @MeltingPoint, @Conditi
             com.ExecuteNonQuery();
 
             //И отпишемся.
-            SimpleMsg(handler, "Add_Molecule: done");
+            CurUser.Transport.SimpleMsg(handler, "Add_Molecule: done");
         }
 
         /// <summary>
         /// Показывает справку о команде
         /// </summary>
         /// <param name="handler"></param>
-        private void SendHelp(Socket handler)
+        private void SendHelp(Socket handler, User CurUser)
         {
-            SimpleMsg(handler, @"List of molecules. The main interface to work with molecules. Possible comands:
+            CurUser.Transport.SimpleMsg(handler, @"List of molecules. The main interface to work with molecules. Possible comands:
  - molecules.add - Adds new molecule
  - molecules.search - changes user information");
         }
@@ -178,12 +178,7 @@ VALUES (@Name, @Laboratory, @Person, @Structure, @State, @MeltingPoint, @Conditi
             List<string> Result = Get_Mol(CurUser, Structure, SearchAria, Status.ToInt(), UserID);
 
             // Отправляем ответ клиенту
-            SendMsg(handler, Answer.StartMsg);
-            for (int i = 0; i < Result.Count(); i++)
-            {
-                SendMsg(handler, Result[i]);
-            }
-            SendMsg(handler, Answer.EndMsg);
+            CurUser.Transport.SimpleMsg(handler, Result);
         }
 
 
@@ -354,41 +349,7 @@ VALUES (@Name, @Laboratory, @Person, @Structure, @State, @MeltingPoint, @Conditi
             return MT;
         }
 
-        /// <summary>
-        /// Поиск элементов в БД
-        /// </summary>
-        /// <param name="DataBase"></param>
-        /// <param name="Query"></param>
-        /// <returns></returns>
-        private List<string> GetRows(string Query)
-        {
-            List<string> Result = new List<string>();
-
-            // Получение данных из БД по запросу
-            DataTable DT = DataBase.Query(Query);
-
-            if (DT.Rows.Count > 0)  // Выводим результат
-            {
-                for (int i = 0; i < DT.Rows.Count; i++)
-                {
-                    for (int j = 0; j < DT.Columns.Count; j++)
-                    {
-                        Result.Add(NotNull(DT.Rows[i].ItemArray[j].ToString().Trim("\n"[0])));
-                    }
-                }
-
-            }
-            else
-            {
-                for (int j = 1; j < DT.Columns.Count; j++)
-                {
-                    Result.Add("ERROR 2 – Data not found");
-                }
-            }
-
-            return Result;
-        }
-
+        
         /// <summary>
         /// NotNull без пробелов элемент из БД
         /// </summary>
@@ -413,13 +374,6 @@ VALUES (@Name, @Laboratory, @Person, @Structure, @State, @MeltingPoint, @Conditi
             return NotNull(ConsoleServer.Program.CommonAES.DecryptStringFromBytes(
                 dt.Rows[i].ItemArray[j] as byte[])).Trim(new char[] { "\n"[0], ' ' });
         }
-
-        private string NotNull(string Text)
-        {
-            return Text != "" ? Text : "<@None@>";
-        }
-
-
     }
 
 

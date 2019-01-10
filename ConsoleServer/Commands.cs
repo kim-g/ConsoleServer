@@ -21,18 +21,6 @@ namespace Commands
         }
 
         /// <summary>
-        /// Посылает сообщение с открывающей и закрывающей командами
-        /// </summary>
-        /// <param name="handler">Сокет, через который отправляется сообщение</param>
-        /// <param name="Message">Текст сообщения</param>
-        public static void SimpleMsg(Socket handler, string Message)
-        {
-            SendMsg(handler, Answer.StartMsg);
-            SendMsg(handler, Message);
-            SendMsg(handler, Answer.EndMsg);
-        }
-
-        /// <summary>
         /// Очищает список параметров от мусора и соединяет в одну строку
         /// </summary>
         /// <param name="Param">Параметры</param>
@@ -145,7 +133,7 @@ namespace Commands
             string[] Params, List<User> ActiveUsers, int LogID);
     }
 
-interface ILogCommand
+    interface ILogCommand
     {
         /// <summary>
         /// Выполняет поиск подкоманды и обеспечивает её реализацию

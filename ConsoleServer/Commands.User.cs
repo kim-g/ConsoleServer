@@ -35,26 +35,26 @@ namespace Commands
         {
             if (Command.Length == 1)
             {
-                SendHelp(handler);
+                SendHelp(handler, CurUser);
                 return;
             }
 
             switch (Command[1].ToLower())
             {
-                case Help: SendHelp(handler); break;
+                case Help: SendHelp(handler, CurUser); break;
                 case List: ShowUsersList(handler, CurUser, Params); break;
                 case ActiveUsersList: ShowActiveUsersList(handler, CurUser, Params); break;
                 case Add: AddUser(handler, CurUser, Params); break;
                 case Update: UpdateUser(handler, CurUser, Params); break;
                 case Remove: RemoveUser(handler, CurUser, Params); break;
                 case RMRF: RMRFUser(handler, CurUser, Params); break;
-                default: SimpleMsg(handler, "Unknown command"); break;
+                default: CurUser.Transport.SimpleMsg(handler, "Unknown command"); break;
             }
         }
 
-        private void SendHelp(Socket handler)
+        private void SendHelp(Socket handler, User CurUser)
         {
-            SimpleMsg(handler, @"List of users. Helps to manage user list. Possible comands:
+            CurUser.Transport.SimpleMsg(handler, @"List of users. Helps to manage user list. Possible comands:
  - users.list - shows all users;
  - users.active - shows currently logged in users;
  - users.add - Adds new user
@@ -98,7 +98,7 @@ INNER JOIN `laboratory` ON (`laboratory`.`id` = `persons`.`laboratory`)";
                 // Служебные
                 if (Param[0] == "help")     // Помощь
                 {
-                    SimpleMsg(handler, @"user.list shows list of all users on the server. There are several filter parameters:
+                    CurUser.Transport.SimpleMsg(handler, @"user.list shows list of all users on the server. There are several filter parameters:
 
  - id [Number] - Show person with ID = Number;
  - surname [Name] - Show persons with surname containings [Name];
@@ -140,9 +140,9 @@ Parameters may be combined.");
             DataTable Res = DataBase.Query(Query);
 
             // И пошлём всё пользователю.
-            SendMsg(handler, Answer.StartMsg);
-            SendMsg(handler, "| ID     | Surname              | Name                 | Second Name          | login           | Lab.  | Job        | Perm. |");
-            SendMsg(handler, "|--------|----------------------|----------------------|----------------------|-----------------|-------|------------|-------|");
+            List<string> Out = new List<string>();
+            Out.Add("| ID     | Surname              | Name                 | Second Name          | login           | Lab.  | Job        | Perm. |");
+            Out.Add("|--------|----------------------|----------------------|----------------------|-----------------|-------|------------|-------|");
 
             //Server Fail – quit date of restart
             if (Res.Rows.Count == 0) SendMsg(handler, "Results not found");
@@ -157,9 +157,9 @@ Parameters may be combined.");
                 msg += StringLength(Res.Rows[i].ItemArray[4].ToString(), 05) + " | ";
                 msg += StringLength(Res.Rows[i].ItemArray[5].ToString(), 10) + " | ";
                 msg += StringLength(Res.Rows[i].ItemArray[6].ToString(), 05) + " | ";
-                SendMsg(handler, msg);
+                Out.Add(msg);
             }
-            SendMsg(handler, Answer.EndMsg);
+            CurUser.Transport.SimpleMsg(handler, Out);
         }
 
         /// <summary>
@@ -173,11 +173,11 @@ Parameters may be combined.");
             // Если не админ, то ничего не покажем!
             if (!CurUser.IsAdmin())
             {
-                SimpleMsg(handler, "Access denied! You should have admin privelegies");
+                CurUser.Transport.SimpleMsg(handler, "Access denied! You should have admin privelegies");
                 return;
             }
 
-            SendMsg(handler, Answer.StartMsg);
+            List<string> Out = new List<string>();
             foreach (User U in ConsoleServer.Program.Active_Users)
             {
                 string msg = "| " + StringLength(U.GetID().ToString(), 05) + " | ";
@@ -192,9 +192,9 @@ Parameters may be combined.");
                 msg += StringLength(U.GetPermissionsInt().ToString(), 5) + " | ";
                 msg += StringLength(U.GetUserID().ToString(), 20) + " | ";
 
-                SendMsg(handler, msg);
+                Out.Add(msg);
             }
-            SendMsg(handler, Answer.EndMsg);
+            CurUser.Transport.SimpleMsg(handler, Out);
         }
 
         /// <summary>
@@ -208,7 +208,7 @@ Parameters may be combined.");
             // Если не админ и не менеджер, то ничего не покажем!
             if (!CurUser.GetUserAddRermissions())
             {
-                SimpleMsg(handler, "Access denied");
+                CurUser.Transport.SimpleMsg(handler, "Access denied");
                 return;
             }
 
@@ -241,7 +241,7 @@ Parameters may be combined.");
                     case "laboratory": Laboratory = SimpleParam(Param); break;
                     case "laboratory_id": LaboratoryID = SimpleParam(Param); break;
                     case "job": Job = AllParam(Param); break;
-                    case "help": SimpleMsg(handler, @"Command to add new user. Please, enter all information about the user. Parameters must include:
+                    case "help": CurUser.Transport.SimpleMsg(handler, @"Command to add new user. Please, enter all information about the user. Parameters must include:
  - name [Name] - person's first name
  - second_name [Name] - person's second name. May be empty.
  - surname [Name] - person's surname.
@@ -266,60 +266,36 @@ or
 
 
             // Проверяем, все ли нужные данные есть
-            if (Name == "") { SimpleMsg(handler, "Error: No name entered"); return; }
-            if (Surname == "") { SimpleMsg(handler, "Error: No surname entered"); return; }
-            if (LoginN == "") { SimpleMsg(handler, "Error: No login entered"); return; }
-            if (Password == "") { SimpleMsg(handler, "Error: No password entered"); return; }
-            if (CPassword == "") { SimpleMsg(handler, "Error: No password conformation entered"); return; }
-            if (Permissions == "") { SimpleMsg(handler, "Error: No permissions entered"); return; }
-            if (Laboratory == "" && LaboratoryID == "") { SimpleMsg(handler, "Error: No laboratory number entered"); return; }
+            if (Name == "") { CurUser.Transport.SimpleMsg(handler, "Error: No name entered"); return; }
+            if (Surname == "") { CurUser.Transport.SimpleMsg(handler, "Error: No surname entered"); return; }
+            if (LoginN == "") { CurUser.Transport.SimpleMsg(handler, "Error: No login entered"); return; }
+            if (Password == "") { CurUser.Transport.SimpleMsg(handler, "Error: No password entered"); return; }
+            if (CPassword == "") { CurUser.Transport.SimpleMsg(handler, "Error: No password conformation entered"); return; }
+            if (Permissions == "") { CurUser.Transport.SimpleMsg(handler, "Error: No permissions entered"); return; }
+            if (Laboratory == "" && LaboratoryID == "") { CurUser.Transport.SimpleMsg(handler, "Error: No laboratory number entered"); return; }
 
             if (LaboratoryID != "")
             {
                 if (DataBase.RecordsCount("laboratory", "id=" + LaboratoryID) == 0)
-                { SimpleMsg(handler, "Error: Laboratory not found"); return; }
+                { CurUser.Transport.SimpleMsg(handler, "Error: Laboratory not found"); return; }
             }
             if (Laboratory != "")
             {
                 DataTable DT = DataBase.Query("SELECT `id` FROM `laboratory` WHERE `abbr`='" + Laboratory + "' LIMIT 1;");
-                if (DT.Rows.Count == 0) { SimpleMsg(handler, "Error: Laboratory not found"); return; };
+                if (DT.Rows.Count == 0) { CurUser.Transport.SimpleMsg(handler, "Error: Laboratory not found"); return; };
                 LaboratoryID = DT.Rows[0].ItemArray[0].ToString();
             }
 
             // Проверка корректности введённых данных
             if (DataBase.RecordsCount("persons", "`login`='" + LoginN + "'") > 0)
-            { SimpleMsg(handler, "Error: Login exists"); return; };
+            { CurUser.Transport.SimpleMsg(handler, "Error: Login exists"); return; };
             if (Password != CPassword)
-            { SimpleMsg(handler, "Error: \"password\" and \"confirm\" should be the similar"); return; }
+            { CurUser.Transport.SimpleMsg(handler, "Error: \"password\" and \"confirm\" should be the similar"); return; }
 
             // Добавление пользователя в БД
             new User(LoginN, Password, Name, FName, Surname, Convert.ToInt32(Permissions), LaboratoryID, Job,
                 DataBase);
-            SimpleMsg(handler, "User added");
-
-            /*          
-                        /\
-                        /o \
-                        /o  o\
-                        --/\--
-                        /O \
-                        /    \
-                        /o   O \
-                    /o   o   \
-                    ---/  \---
-                        /O  o\
-                        /      \
-                    /o  O   O\
-                    /     o    \
-                    /  O      O  \
-                    -----|  |-----
-                        |  |
-                        |  |
-                        ----
-
-            */
-
-
+            CurUser.Transport.SimpleMsg(handler, "User added");          
         }
 
         /// <summary>
@@ -333,7 +309,7 @@ or
             // Если не админ и не менеджер, то ничего не покажем!
             if (!CurUser.GetUserAddRermissions())
             {
-                SimpleMsg(handler, "Access denied");
+                CurUser.Transport.SimpleMsg(handler, "Access denied");
                 return;
             }
 
@@ -370,7 +346,7 @@ or
                 // Помощь
                 if (Param[0] == "help")
                 {
-                    SimpleMsg(handler, @"Command to update user's information. Parameters may include:
+                    CurUser.Transport.SimpleMsg(handler, @"Command to update user's information. Parameters may include:
  - login [login] - login of user to change
  - name [Name] - person's first name
  - second.name [Name] - person's second name. May be empty.
@@ -396,27 +372,27 @@ or
             }
 
             // Проверяем, все ли нужные данные есть
-            if (ULogin == "") { SimpleMsg(handler, "Error: No login of user to change information. Use \"login\" parameter."); return; }
+            if (ULogin == "") { CurUser.Transport.SimpleMsg(handler, "Error: No login of user to change information. Use \"login\" parameter."); return; }
             int LabNum = -1;
             if (Laboratory != "")
             {
                 DataTable DT = DataBase.Query("SELECT `id` FROM `laboratory` WHERE `abbr`='" + Laboratory + "' LIMIT 1;");
-                if (DT.Rows.Count == 0) { SimpleMsg(handler, "Error: Laboratory not found"); return; };
+                if (DT.Rows.Count == 0) { CurUser.Transport.SimpleMsg(handler, "Error: Laboratory not found"); return; };
                 LabNum = (int)DT.Rows[0].ItemArray[0];
             }
 
             // Проверка корректности введённых данных
             if (LoginN != "")
                 if (DataBase.RecordsCount("persons", "`login`='" + LoginN + "'") > 0)
-                { SimpleMsg(handler, "Error: Login exists"); return; };
+                { CurUser.Transport.SimpleMsg(handler, "Error: Login exists"); return; };
             if (Password != "")
                 if (Password != CPassword)
-                { SimpleMsg(handler, "Error: \"password\" and \"confirm\" should be the similar"); return; }
+                { CurUser.Transport.SimpleMsg(handler, "Error: \"password\" and \"confirm\" should be the similar"); return; }
             if (LabNum != -1)
                 if (DataBase.RecordsCount("laboratory", "`id`=" + LabNum.ToString() + "") == 0)
-                { SimpleMsg(handler, "Error: Laboratory not found"); return; };
+                { CurUser.Transport.SimpleMsg(handler, "Error: Laboratory not found"); return; };
             List<string> id_list = DataBase.QueryOne("SELECT `id` FROM `persons` WHERE `login` = '" + ULogin + "' LIMIT 1;");
-            if (id_list == null) { SimpleMsg(handler, "Error: No such login of user to change information."); return; }
+            if (id_list == null) { CurUser.Transport.SimpleMsg(handler, "Error: No such login of user to change information."); return; }
 
             // Открытие записи пользователя в БД
             User UserToChange = new User(id_list[0], DataBase);
@@ -424,32 +400,32 @@ or
             //Испраляем всё то, что нам послали.
             if (Name != "")
                 if (!UserToChange.SetName(Name))
-                { SimpleMsg(handler, "Error: Unable to change name."); return; };
+                { CurUser.Transport.SimpleMsg(handler, "Error: Unable to change name."); return; };
             if (FName != "")
                 if (!UserToChange.SetSecondName(FName))
-                { SimpleMsg(handler, "Error: Unable to change second name."); return; };
+                { CurUser.Transport.SimpleMsg(handler, "Error: Unable to change second name."); return; };
             if (Surname != "")
                 if (!UserToChange.SetSurname(Surname))
-                { SimpleMsg(handler, "Error: Unable to change surname."); return; };
+                { CurUser.Transport.SimpleMsg(handler, "Error: Unable to change surname."); return; };
             if (LoginN != "")
                 if (!UserToChange.SetLogin(LoginN))
-                { SimpleMsg(handler, "Error: Unable to change login. New login should be uniqe."); return; };
+                { CurUser.Transport.SimpleMsg(handler, "Error: Unable to change login. New login should be uniqe."); return; };
             if (Password != "")
                 if (!UserToChange.SetPassword(OldPassword, Password))
-                { SimpleMsg(handler, "Error: Unable to change password. Old password may be not valid or some error happend."); return; };
+                { CurUser.Transport.SimpleMsg(handler, "Error: Unable to change password. Old password may be not valid or some error happend."); return; };
             if (Permissions != "")
                 if (!UserToChange.SetRights(Convert.ToInt32(Permissions)))
-                { SimpleMsg(handler, "Error: Unable to change permissions."); return; };
+                { CurUser.Transport.SimpleMsg(handler, "Error: Unable to change permissions."); return; };
             if (Laboratory != "")
                 if (!UserToChange.SetLaboratory(LabNum))
-                { SimpleMsg(handler, "Error: Unable to change laboratory."); return; };
+                { CurUser.Transport.SimpleMsg(handler, "Error: Unable to change laboratory."); return; };
             if (Job != "")
                 if (!UserToChange.SetJob(Job))
-                { SimpleMsg(handler, "Error: Unable to change job."); return; };
+                { CurUser.Transport.SimpleMsg(handler, "Error: Unable to change job."); return; };
 
 
             // Отсылаем команду, что всё хорошо.
-            SimpleMsg(handler, "User information updated");
+            CurUser.Transport.SimpleMsg(handler, "User information updated");
 
             /*          
                         /\
@@ -486,7 +462,7 @@ or
             // Если не админ и не менеджер, то ничего не покажем!
             if (!CurUser.GetUserAddRermissions())
             {
-                SimpleMsg(handler, "Access denied");
+                CurUser.Transport.SimpleMsg(handler, "Access denied");
                 return;
             }
 
@@ -502,32 +478,29 @@ or
                 // Помощь
                 if (Param[0] == "help")
                 {
-                    Users_Remove_Help(handler);
+                    Users_Remove_Help(handler, CurUser);
                     return;
                 }
 
                 // Проверяем, все ли нужные данные есть
-                if (ULogin == "") { Users_Remove_Help(handler); return; }
+                if (ULogin == "") { Users_Remove_Help(handler, CurUser); return; }
                 List<string> id_list = DataBase.QueryOne("SELECT `id` FROM `persons` WHERE `login` = '" + ULogin + "' LIMIT 1;");
-                if (id_list == null) { SimpleMsg(handler, "Error: No such login of user to change information."); return; }
+                if (id_list == null) { CurUser.Transport.SimpleMsg(handler, "Error: No such login of user to change information."); return; }
 
                 // Ищем пользователя.
                 User UserToChange = new User(id_list[0], DataBase);
                 UserToChange.SetActive(false);
 
                 // И отошлём информацию, что всё OK
-                SimpleMsg(handler, "User was removed successfully");
+                CurUser.Transport.SimpleMsg(handler, "User was removed successfully");
             }
         }
 
-        
-        private void Users_Remove_Help(Socket handler)
-        {
-            SendMsg(handler, Commands.Answer.StartMsg);
-            SendMsg(handler, @"Command to remove user from the system. Reversible. Safe. Parameters may include:
+
+        private void Users_Remove_Help(Socket handler, User CurUser) => 
+            CurUser.Transport.SimpleMsg(handler, 
+                @"Command to remove user from the system. Reversible. Safe. Parameters may include:
  - login [login] - login of user to remove.");
-            SendMsg(handler, Commands.Answer.EndMsg);
-        }
 
 
         /// <summary>
@@ -541,7 +514,7 @@ or
             // Если не админ, то ничего не покажем!
             if (!CurUser.IsAdmin())
             {
-                SimpleMsg(handler, "Access denied");
+                CurUser.Transport.SimpleMsg(handler, "Access denied");
                 return;
             }
 
@@ -560,7 +533,7 @@ or
                 // Помощь
                 if (Param[0] == "help")
                 {
-                    Users_Remove_Help(handler);
+                    Users_Remove_Help(handler, CurUser);
                     return;
                 }
 
@@ -568,16 +541,16 @@ or
 
 
             // Проверяем, все ли нужные данные есть 
-            if (ULogin == "") { Users_Remove_Help(handler); return; }
+            if (ULogin == "") { Users_Remove_Help(handler, CurUser); return; }
             List<string> id_list = DataBase.QueryOne("SELECT `id` FROM `persons` WHERE `login` = '" + ULogin + "' LIMIT 1;");
-            if (id_list == null) { SimpleMsg(handler, "Error: No such login of user to change information."); return; }
+            if (id_list == null) { CurUser.Transport.SimpleMsg(handler, "Error: No such login of user to change information."); return; }
 
             // Ищем пользователя.
             User UserToChange = new User(id_list[0], DataBase);
             UserToChange.DeleteUser();
 
             // И отошлём информацию, что всё OK
-            SimpleMsg(handler, "User was deleted successfully");
+            CurUser.Transport.SimpleMsg(handler, "User was deleted successfully");
         }
     }
 }

@@ -31,16 +31,16 @@ namespace Commands
         {
             if (Command[0].Length == 0)
             {
-                SendHelp(handler);
+                SendHelp(handler, CurUser);
                 return;
             }
 
             switch (Command[0].ToLower())
             {
-                case Help: SendHelp(handler); break;
+                case Help: SendHelp(handler, CurUser); break;
                 default:
                     Log.AddToQueryLog(DataBase, LogID, "! Unknown command");
-                    SimpleMsg(handler, "Error 1: Unknown command in line 0");
+                    CurUser.Transport.SimpleMsg(handler, "Error 1: Unknown command in line 0");
                     break;
             }
         }
@@ -49,7 +49,8 @@ namespace Commands
         /// Показывает справку о команде
         /// </summary>
         /// <param name="handler"></param>
-        private static void SendHelp(Socket handler) => SimpleMsg(handler, @"Administrator's console. Gives the direct access to server. Possible comands:
+        private static void SendHelp(Socket handler, User CurUser) => 
+            CurUser.Transport.SimpleMsg(handler, @"Administrator's console. Gives the direct access to server. Possible comands:
  - log - direct access to server's logs;
  - database - direct access to server's database;
  - users - direct access to list of users

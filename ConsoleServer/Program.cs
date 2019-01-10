@@ -11,6 +11,7 @@ using System.Net.Sockets;
 using MySql.Data.MySqlClient;
 using Extentions;
 using System.Threading.Tasks;
+using MoleculeDataBase;
 
 namespace ConsoleServer
 {
@@ -76,7 +77,7 @@ namespace ConsoleServer
             Commands.Log Log = (Commands.Log)(BaseCommands.Where(x => x.Name == "log").ToArray()[0]);
 
             // Открываем файл-ключ
-            CommonAES = AES_Data.LoadFromFile("vector.bin");
+            CommonAES = (AES_Data)AES_Data.LoadFromFile("vector.bin");
 
             // Устанавливаем для сокета локальную конечную точку
             IPEndPoint ipEndPoint = new IPEndPoint(IPAddress.Any, 11000);
@@ -122,9 +123,17 @@ namespace ConsoleServer
         /// </summary>
         /// <param name="handler"></param>
         /// <param name="Msg"></param>
-        public static void SendMsg(Socket handler, string Msg)
+        public static void SendMsg(Socket handler, string Msg, User CurUser = null)
         {
-            byte[] msg = Encoding.UTF8.GetBytes(Msg + "\n");
+            byte[] msg = CurUser == null
+                ? Encoding.UTF8.GetBytes(Msg + "\n")
+                : CurUser.Transport.Crypt.EncryptStringToBytes(Msg + "\n");
+            handler.Send(BitConverter.GetBytes(msg.Length));
+            using (FileStream FS = new FileStream("temp.dat", FileMode.Create))
+            {
+                FS.Write(msg, 0, msg.Length);
+                FS.Close();
+            };
             handler.Send(msg);
         }
 

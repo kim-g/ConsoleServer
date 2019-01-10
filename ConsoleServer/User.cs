@@ -27,10 +27,15 @@ namespace ConsoleServer
         int SessionID;
         bool Active = true;
         DB DataBase;
+        public Communication Transport = new Communication();
 
         public const string NoUserID = "NoUserID";
 
-        //Создание пользователя по его ID
+        /// <summary>
+        /// Создание пользователя по его ID
+        /// </summary>
+        /// <param name="UserID"> Номер пользователя</param>
+        /// <param name="_DataBase">База данных</param>
         public User(string UserID, DB _DataBase)
         {
             // Запишем DB
@@ -59,9 +64,15 @@ namespace ConsoleServer
             Login = (DT.Rows[0].ItemArray[6] as string).Trim(new char[] { "\n"[0], "\r"[0], ' ' });
             Job = DT.Rows[0].ItemArray[8] as string;
             Active = Convert.ToInt32(DT.Rows[0].ItemArray[9]) == 1;
-
         }
 
+        /// <summary>
+        /// Создание пользователя по его имени и паролю
+        /// </summary>
+        /// <param name="UserName"></param>
+        /// <param name="UserPassword"></param>
+        /// <param name="_DataBase"></param>
+        /// <param name="_IP"></param>
         public User(string UserName, string UserPassword, DB _DataBase, string _IP = "NOT SET")
         {
             // Запишем DB
@@ -101,8 +112,21 @@ namespace ConsoleServer
             Job = DT.Rows[0].ItemArray[8] as string;
             LastUsed = DateTime.Now;
             IP = _IP;
+
         }
 
+        /// <summary>
+        /// Создание нового пользователя
+        /// </summary>
+        /// <param name="UserName"></param>
+        /// <param name="UserPassword"></param>
+        /// <param name="_Name"></param>
+        /// <param name="_FName"></param>
+        /// <param name="_Surname"></param>
+        /// <param name="_Permissions"></param>
+        /// <param name="_Laboratory"></param>
+        /// <param name="_Job"></param>
+        /// <param name="_DataBase"></param>
         public User(string UserName, string UserPassword, string _Name, string _FName, string _Surname,
             int _Permissions, string _Laboratory, string _Job, DB _DataBase)
         {

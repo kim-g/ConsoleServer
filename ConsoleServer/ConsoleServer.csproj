@@ -46,13 +46,13 @@
     </Reference>
     <Reference Include="System" />
     <Reference Include="System.Core" />
+    <Reference Include="System.Runtime.Serialization.Formatters.Soap" />
     <Reference Include="System.Xml.Linq" />
     <Reference Include="System.Data.DataSetExtensions" />
     <Reference Include="System.Data" />
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="AES_Data.cs" />
     <Compile Include="Commands.Account.cs" />
     <Compile Include="Commands.cs" />
     <Compile Include="Commands.Database.cs" />
@@ -63,6 +63,7 @@
     <Compile Include="Commands.Molecules.cs" />
     <Compile Include="Commands.Status.cs" />
     <Compile Include="Commands.User.cs" />
+    <Compile Include="Communication.cs" />
     <Compile Include="DB.cs" />
     <Compile Include="Files.cs" />
     <Compile Include="Molecule_Transport.cs" />
@@ -73,6 +74,12 @@
   </ItemGroup>
   <ItemGroup>
     <None Include="App.config" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\MoleculeDataBase\MoleculeDataBase\MoleculeDataBase.csproj">
+      <Project>{30a6cbc1-1877-40e0-bbfe-799136168148}</Project>
+      <Name>MoleculeDataBase</Name>
+    </ProjectReference>
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 

@@ -1,4 +1,5 @@
 ﻿using ConsoleServer;
+using System.Collections.Generic;
 using System.Data;
 using System.Linq;
 using System.Net.Sockets;
@@ -31,24 +32,24 @@ namespace Commands
         {
             if (Command.Length == 1)
             {
-                SendHelp(handler);
+                SendHelp(handler, CurUser);
                 return;
             }
 
             switch (Command[1].ToLower())
             {
-                case Help: SendHelp(handler); break;
+                case Help: SendHelp(handler, CurUser); break;
                 case Add: AddLaboratory(handler, CurUser, Params); break;
                 case Edit: UpdateLaboratory(handler, CurUser, Params); break;
                 case List: ListShow(handler, CurUser, Params); break;
                 case Names: NamesShow(handler, CurUser, Params); break;
-                default: SimpleMsg(handler, "Unknown command"); break;
+                default: CurUser.Transport.SimpleMsg(handler, "Unknown command"); break;
             }
         }
 
-        private void SendHelp(Socket handler)
+        private void SendHelp(Socket handler, User CurUser)
         {
-            SimpleMsg(handler, @"List of laboratories. Helps to manage it. Possible comands:
+            CurUser.Transport.SimpleMsg(handler, @"List of laboratories. Helps to manage it. Possible comands:
  - users.list - shows all users;
  - users.add - Adds new laboratory
  - users.update - changes laboratory information
@@ -60,7 +61,7 @@ namespace Commands
             // Если не админ и не менеджер, то ничего не покажем!
             if (!CurUser.GetUserAddRermissions())
             {
-                SimpleMsg(handler, "Access denied");
+                CurUser.Transport.SimpleMsg(handler, "Access denied");
                 return;
             }
 
@@ -79,7 +80,7 @@ namespace Commands
                 // Помощь
                 if (Param[0] == "help")
                 {
-                    SimpleMsg(handler, @"Command to add new Laboratory. Please, enter all information about the Laboratory. Parameters must include:
+                    CurUser.Transport.SimpleMsg(handler, @"Command to add new Laboratory. Please, enter all information about the Laboratory. Parameters must include:
  - name [Name] - laboratory's full name
  - abb [ABB] - laboratory's abbriviation.");
                     return;
@@ -89,19 +90,19 @@ namespace Commands
             // Проверяем данные
             if (LName == "")
             {
-                SimpleMsg(handler, "Enter name of laboratory");
+                CurUser.Transport.SimpleMsg(handler, "Enter name of laboratory");
                 return;
             }
             if (LAbbr == "")
             {
-                SimpleMsg(handler, "Enter abbrivation of laboratory");
+                CurUser.Transport.SimpleMsg(handler, "Enter abbrivation of laboratory");
                 return;
             }
 
             // Добавляем в базу
             DataBase.ExecuteQuery("INSERT INTO `laboratory` (`name`, `abbr`) VALUES  ('" +
                 LName + "','" + LAbbr + "')");
-            SimpleMsg(handler, "Laboratory added successfully");
+            CurUser.Transport.SimpleMsg(handler, "Laboratory added successfully");
         }
 
         private void UpdateLaboratory(Socket handler, User CurUser, string[] Params)
@@ -109,7 +110,7 @@ namespace Commands
             // Если не админ и не менеджер, то ничего не покажем!
             if (!CurUser.GetUserAddRermissions())
             {
-                SimpleMsg(handler, "Access denied");
+                CurUser.Transport.SimpleMsg(handler, "Access denied");
                 return;
             }
 
@@ -130,7 +131,7 @@ namespace Commands
                 // Помощь
                 if (Param[0] == "help")
                 {
-                    SimpleMsg(handler, @"Command to add new Laboratory. Please, enter all information about the Laboratory. Parameters must include:
+                    CurUser.Transport.SimpleMsg(handler, @"Command to add new Laboratory. Please, enter all information about the Laboratory. Parameters must include:
  - name [Name] - laboratory's full name
  - abb [ABB] - laboratory's abbriviation.");
                     return;
@@ -140,17 +141,17 @@ namespace Commands
             // Проверяем данные
             if (ID == "")
             {
-                SimpleMsg(handler, "No ID entered");
+                CurUser.Transport.SimpleMsg(handler, "No ID entered");
                 return;
             }
             if (DataBase.RecordsCount("laboratory", "`id`=" + ID) == 0)
             {
-                SimpleMsg(handler, "Laboratory with ID = " + ID + " was not found");
+                CurUser.Transport.SimpleMsg(handler, "Laboratory with ID = " + ID + " was not found");
                 return;
             }
             if (LName == "" && LAbbr == "")
             {
-                SimpleMsg(handler, "Error: Nothing to change");
+                CurUser.Transport.SimpleMsg(handler, "Error: Nothing to change");
                 return;
             }
 
@@ -166,7 +167,7 @@ namespace Commands
 
             // Добавляем в базу
             DataBase.ExecuteQuery("UPDATE `laboratory` SET " + Addition + " WHERE `id`=" + ID + " LIMIT 1;");
-            SimpleMsg(handler, "Laboratory updated successfully");
+            CurUser.Transport.SimpleMsg(handler, "Laboratory updated successfully");
         }
 
         private void ListShow(Socket handler, User CurUser, string[] Params)
@@ -192,7 +193,7 @@ namespace Commands
                 // Служебные
                 if (Param[0] == "help")     // Помощь
                 {
-                    SimpleMsg(handler, @"Command to show list of laboratories. You may enter filter. Possible filters:
+                    CurUser.Transport.SimpleMsg(handler, @"Command to show list of laboratories. You may enter filter. Possible filters:
  - id [Number] - laboratory's ID
  - name [Name] - laboratory's full name
  - abb [ABB] - laboratory's abbriviation
@@ -236,21 +237,21 @@ namespace Commands
             DataTable Res = DataBase.Query(Query);
 
             // И отошлём всё.
-            ConsoleServer.Program.SendMsg(handler, Answer.StartMsg);
-            ConsoleServer.Program.SendMsg(handler, "| ID\t | Abbr \t |Name");
-            ConsoleServer.Program.SendMsg(handler, "|--------|--------|-----------------------");
+            List<string> Out = new List<string>();
+            Out.Add("| ID\t | Abbr \t |Name");
+            Out.Add("|--------|--------|-----------------------");
 
             //Server Fail – quit date of restart
-            if (Res.Rows.Count == 0) ConsoleServer.Program.SendMsg(handler, "Results not found");
+            if (Res.Rows.Count == 0) Out.Add("Results not found");
 
             for (int i = 0; i < Res.Rows.Count; i++)
             {
                 string msg = "| " + Res.Rows[i].ItemArray[0].ToString() + "\t | ";
                 msg += Res.Rows[i].ItemArray[1].ToString() + "\t | ";
                 msg += Res.Rows[i].ItemArray[2].ToString();
-                ConsoleServer.Program.SendMsg(handler, msg);
+                Out.Add(msg);
             }
-            ConsoleServer.Program.SendMsg(handler, Answer.EndMsg);
+            CurUser.Transport.SimpleMsg(handler, Out);
 
         }
 
@@ -261,18 +262,18 @@ namespace Commands
             DataTable Res = DataBase.Query(Query);
 
             // И отошлём их, разделяя ID и имя знаком '='
-            ConsoleServer.Program.SendMsg(handler, Answer.StartMsg);
+            List<string> Out = new List<string>();
 
             // Server Fail – quit date of restart
-            if (Res.Rows.Count == 0) SimpleMsg(handler, "Results not found");
+            if (Res.Rows.Count == 0) Out.Add("Results not found");
 
             for (int i = 0; i < Res.Rows.Count; i++)
             {
                 string msg = Res.Rows[i].ItemArray[0].ToString() + "=";
                 msg += Res.Rows[i].ItemArray[1].ToString();
-                ConsoleServer.Program.SendMsg(handler, msg);
+                Out.Add(msg);
             }
-            ConsoleServer.Program.SendMsg(handler, Answer.EndMsg);
+            CurUser.Transport.SimpleMsg(handler, Out);
         }
     }
 }

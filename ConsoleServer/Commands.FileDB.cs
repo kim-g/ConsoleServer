@@ -36,17 +36,17 @@ namespace Commands
         {
             if (Command.Length == 1)
             {
-                SendHelp(handler);
+                SendHelp(handler, CurUser);
                 return;
             }
 
             switch (Command[1].ToLower())
             {
-                case Help: SendHelp(handler); break;
+                case Help: SendHelp(handler, CurUser); break;
                 case GetName: GetFileName(handler, CurUser, Params); break; // Послать название файла
                 case Get: SendFile(handler, CurUser, Params); break; // Команда принять, значит мы посылаем
                 case Send: GetFile(handler, CurUser, Params); break; // Команда Послать, значит мы принимаем
-                default: SimpleMsg(handler, "Unknown command"); break;
+                default: CurUser.Transport.SimpleMsg(handler, "Unknown command"); break;
             }
         }
 
@@ -54,9 +54,9 @@ namespace Commands
         /// Показывает справку о команде
         /// </summary>
         /// <param name="handler"></param>
-        private void SendHelp(Socket handler)
+        private void SendHelp(Socket handler, User CurUser)
         {
-            SimpleMsg(handler, @"Work with files. Not for console use exept:
+            CurUser.Transport.SimpleMsg(handler, @"Work with files. Not for console use exept:
  - name [file id] - gives the name of file");
         }
 
@@ -93,13 +93,10 @@ namespace Commands
         /// </summary>
         /// <param name="handler"></param>
         /// <param name="FileToSend"></param>
-        private void SendFileSize(Socket handler, Files FileToSend)
+        private void SendFileSize(Socket handler, User CurUser, Files FileToSend)
         {
-            byte[] msg = Encoding.UTF8.GetBytes(Answer.StartMsg + "\n" + FileToSend.FileName + "\n" + 
-                FileToSend.Data.Count().ToString() + "\n");
-            //Console.WriteLine(msg.Length.ToString() + "; \"" + msg + "\"");
-            handler.Send(BitConverter.GetBytes(msg.Length));
-            handler.Send(msg);
+            CurUser.Transport.SimpleMsg(handler, new string[] { FileToSend.FileName,
+            FileToSend.Data.Count().ToString() }, false);           
         }
 
         /// <summary>
@@ -148,7 +145,7 @@ namespace Commands
             DataBase.ExecuteQuery(@"INSERT INTO `files_to_molecules` (`file`, `molecule`)
 VALUES (" + FileID + ", " + MoleculeID + ")");
 
-            SimpleMsg(handler, FileID.ToString());
+            CurUser.Transport.SimpleMsg(handler, FileID.ToString());
         }
 
         /// <summary>
@@ -166,7 +163,7 @@ VALUES (" + FileID + ", " + MoleculeID + ")");
             if (NewFile.Rows.Count == 0) { Out = "Файл отсутствует"; }
             else { Out = NewFile.Rows[0].ItemArray[0].ToString(); }
 
-            SimpleMsg(handler, Out);
+            CurUser.Transport.SimpleMsg(handler, Out);
         }
     }
 }

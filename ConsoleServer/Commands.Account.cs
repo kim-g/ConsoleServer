@@ -27,17 +27,17 @@ namespace Commands
         {
             if (Command.Length == 1)
             {
-                SendHelp(handler);
+                SendHelp(handler, CurUser);
                 return;
             }
 
             switch (Command[1].ToLower())
             {
-                case Help: SendHelp(handler); break;
+                case Help: SendHelp(handler, CurUser); break;
                 case Login: LogIn(handler, Active_Users, Params, LogID); break;
                 case Quit: UserQuit(handler, CurUser, Active_Users); break;
                 case SetPassword: /*SearchMoleculesBySMILES(handler, CurUser, DataBase, Params); */break;
-                default: SimpleMsg(handler, "Unknown command"); break;
+                default: CurUser.Transport.SimpleMsg(handler, "Unknown command"); break;
             }
         }
 
@@ -45,7 +45,7 @@ namespace Commands
         {
             CurUser.Quit("User Quited");
             Active_Users.Remove(CurUser);
-            SimpleMsg(handler, "OK");
+            CurUser.Transport.SimpleMsg(handler, "OK");
         }
 
         private void LogIn(Socket handler, List<User> Active_Users, string[] Params,
@@ -92,21 +92,24 @@ namespace Commands
                 DataBase.ExecuteQuery("UPDATE `queries` SET `comment` = '! User name and/or pasword invalid' " +
                                     "WHERE `id` = " + LogID.ToString() + ";");
             }
+            NewUser.Transport.SendKey(handler);
 
-            SendMsg(handler, Answer.StartMsg);
-            SendMsg(handler, Answer.LoginOK);
-            SendMsg(handler, NewUser.GetUserID());
-            SendMsg(handler, NewUser.GetID().ToString());
-            SendMsg(handler, NewUser.GetName());
-            SendMsg(handler, NewUser.GetFathersName());
-            SendMsg(handler, NewUser.GetSurname());
-            SendMsg(handler, NewUser.Status());
-            SendMsg(handler, Answer.EndMsg);
+            NewUser.Transport.SimpleMsg(handler, new string[8]
+            {
+                Answer.LoginOK,
+                NewUser.GetUserID(),
+                NewUser.GetID().ToString(),
+                NewUser.GetName(),
+                NewUser.GetFathersName(),
+                NewUser.GetSurname(),
+                NewUser.Status(),
+                NewUser.Status()
+            });
         }
 
-        private void SendHelp(Socket handler)
+        private void SendHelp(Socket handler, User CurUser)
         {
-            SimpleMsg(handler, @"Command for log in system. Possible comands:
+            CurUser.Transport.SimpleMsg(handler, @"Command for log in system. Possible comands:
  - account.login - Log in system
  - account.quit - Log out system
  - account.set_password - Change YOUR password. To change somebody's password use 'users' command");

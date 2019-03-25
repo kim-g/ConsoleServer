@@ -342,8 +342,8 @@ namespace ConsoleServer
 
         bool SetParam(string Param, string Value)
         {
-            return DataBase.ExecuteQuery("UPDATE `persons` SET `" + Param + "`=" + Value + 
-                " WHERE `id` = " + ID + " LIMIT 1") == 1;
+            string value = Value.Replace("{CLEAR}", "");
+            return DataBase.ExecuteQuery($"UPDATE `persons` SET `{Param}`={value} WHERE `id` = {ID} LIMIT 1") == 1;
         }
 
         public bool SetName(string NewName)
@@ -461,6 +461,29 @@ namespace ConsoleServer
                 Program.SimpleMsg(handler, "ERROR – UNKNOWN USER '" + Name + "'");
             }
             return Num.ToString();
+        }
+
+        /// <summary>
+        /// Возвращает экземпляр класса с полной информацией о пользователе для пересылки клиенту
+        /// </summary>
+        /// <returns></returns>
+        public MoleculeDataBase.UserTransport GetTransport()
+        {
+            List<string> Lab = DataBase.QueryOne($"SELECT `abbr`, `name` FROM `laboratory` WHERE `id`={Laboratory}");
+
+            return new MoleculeDataBase.UserTransport()
+            {
+                id = ID,
+                Name = this.Name,
+                SecondName = this.FName,
+                Surname = this.Surname,
+                LaboratoryID = Laboratory,
+                LaboratoryAbbr = Lab[0],
+                LaboratoruName = Lab[1],
+                Login = this.Login,
+                Job = this.Job,
+                Permissions = this.Rights
+            };
         }
 
         const string Salt =   @"ДжОнатан Билл, 

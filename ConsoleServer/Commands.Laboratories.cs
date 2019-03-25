@@ -10,10 +10,10 @@ namespace Commands
     {
         // Команды по лабораториям
         public const string Help = "help";                   // справка по командам laboratories
-        public const string Add = "add";                    // Добавление новой лаборатории
+        public const string Add = "add";                     // Добавление новой лаборатории
         public const string Edit = "update";                 // Изменение лаборатории
         public const string List = "list";                   // Вывод лабораторий на консоль
-        public const string Names = "names";                  // Вывод ID и имён лабораторий 
+        public const string Names = "names";                 // Вывод ID и имён лабораторий 
 
         public Laboratories(DB dataBase) : base(dataBase)
         {

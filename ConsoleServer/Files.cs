@@ -15,7 +15,8 @@ namespace ConsoleServer
         public string Name;             // Название документа. Может быть любым
         public string FileName;         // Имя файла по правилам ОС
         public byte[] Data;             // Само содержимое файла
-        public Stream DataStream;           // Содержимое файла в Stream
+        public Stream DataStream;       // Содержимое файла в Stream
+        public Stream EncryptedDataStream; // Зашифрованное содержимое файла для отправки
 
         // Создаём пустую заготовку только с названием файла
         public Files(string name)
@@ -77,8 +78,10 @@ SELECT LAST_INSERT_ID(); ";
 
             if (dt.Rows.Count == 0) return null;
 
-            return new Files(dt.Rows[0].ItemArray[0].ToString(), dt.Rows[0].ItemArray[1].ToString(),
+            Files NewFile = new Files(dt.Rows[0].ItemArray[0].ToString(), dt.Rows[0].ItemArray[1].ToString(),
                 dt.Rows[0].ItemArray[2] as byte[]);
+
+            return NewFile;
         }
 
         // Загружаем файл с диска и создаём новый объект Files 
@@ -106,6 +109,15 @@ SELECT LAST_INSERT_ID(); ";
                             ID + @" LIMIT 1;");
             if (NewFile.Rows.Count == 0) { return "Файл отсутствует"; }
             return NewFile.Rows[0].ItemArray[0].ToString(); 
+        }
+
+        /// <summary>
+        /// Шифрует содержимое файла для отправки при помощи ключа указанного пользователя.
+        /// </summary>
+        /// <param name="CurUser">Пользователь, чей ключ шифрования применяется.</param>
+        public void Encrypt(User CurUser)
+        {
+            EncryptedDataStream = new MemoryStream(CurUser.Transport.Crypt.EncryptBytes(Data));
         }
     }
 }

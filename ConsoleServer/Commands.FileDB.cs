@@ -71,20 +71,13 @@ namespace Commands
         {
             int FileID = Params[0].ToInt();
             Files FileToSend = Files.Read_From_DB(DataBase, FileID, CurUser);
-            SendFileSize(handler, FileToSend);
-
-            int FtS_Size = FileToSend.Data.Count();
-            for (int i = 0; i < FtS_Size; i += 1024)
+            /*using (FileStream FS = new FileStream("temp.dat", FileMode.Create))
             {
-
-                int block;
-                if (FtS_Size - i < 1024) { block = FtS_Size - i; }
-                else { block = 1024; }
-
-                byte[] buf = new byte[block];
-                FileToSend.DataStream.Read(buf, 0, block);
-                handler.Send(buf);
-            }
+                FS.Write(CurUser.Transport.Crypt.AesKey, 0, CurUser.Transport.Crypt.AesKey.Count());
+                FS.Write(CurUser.Transport.Crypt.AesIV, 0, CurUser.Transport.Crypt.AesIV.Count());
+                FS.Close();
+            }*/
+            CurUser.Transport.SendBinaryData(handler, FileToSend.Data);
 
         }
 
@@ -96,7 +89,7 @@ namespace Commands
         private void SendFileSize(Socket handler, User CurUser, Files FileToSend)
         {
             CurUser.Transport.SimpleMsg(handler, new string[] { FileToSend.FileName,
-            FileToSend.Data.Count().ToString() }, false);           
+            FileToSend.EncryptedDataStream.Length.ToString() });           
         }
 
         /// <summary>

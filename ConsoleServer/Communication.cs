@@ -52,11 +52,6 @@ namespace ConsoleServer
                 ? Crypt.EncryptStringToBytes(Msg + "\n")
                 : Encoding.UTF8.GetBytes(Msg + "\n");
             handler.Send(BitConverter.GetBytes(msg.Length));
-            using (FileStream FS = new FileStream("temp.dat", FileMode.Create))
-            {
-                FS.Write(msg, 0, msg.Length);
-                FS.Close();
-            };
             handler.Send(msg);
         }
 
@@ -80,18 +75,22 @@ namespace ConsoleServer
             byte[] EncryptedData = encrypt
                 ? Crypt.EncryptBytes(Data)
                 : Data;
+
             int FtS_Size = EncryptedData.Count();
             handler.Send(BitConverter.GetBytes(FtS_Size));
-            for (int i = 0; i < FtS_Size; i += 1024)
+            using (MemoryStream MS = new MemoryStream(EncryptedData))
             {
+                MS.Position = 0;
+                for (int i = 0; i < FtS_Size; i += 1024)
+                {
+                    int block;
+                    if (FtS_Size - i < 1024) { block = FtS_Size - i; }
+                    else { block = 1024; }
 
-                int block;
-                if (FtS_Size - i < 1024) { block = FtS_Size - i; }
-                else { block = 1024; }
-
-                byte[] buf = new byte[block];
-                Array.Copy(EncryptedData, i, buf, 0, block);
-                handler.Send(buf);
+                    byte[] buf = new byte[block];
+                    MS.Read(buf, 0, buf.Count());
+                    handler.Send(buf);
+                }
             }
         }
 
@@ -112,12 +111,7 @@ namespace ConsoleServer
         /// <param name="handler"></param>
         public void SendKey(Socket handler)
         {
-            MemoryStream MS = Crypt.ToBin();
-            Console.WriteLine($"Передача данных: {MS.Length} байт.");
-            FileStream FS = new FileStream("temp.dat", FileMode.Create);
-            MS.CopyTo(FS);
-            FS.Close();
-            SendBinaryData(handler, MS, false);
+            SendBinaryData(handler, Crypt.ToBin(), false);
         }
 
         /// <summary>

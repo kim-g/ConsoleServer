@@ -13,6 +13,7 @@ namespace Commands
         // СК по пользователям
         public const string Help = "help";             // Справка по командам со списком пользователей.
         public const string List = "list";  // Вывод всех пользователей
+        public const string ListBin = "get";  // Вывод всех пользователей в двоичном виде
         public const string ActiveUsersList = "active";  // Вывод залогиненных пользователей
         public const string Add = "add";  // Добавление нового пользователя через консоль
         public const string Update = "update";  // Изменение данных пользователя через консоль
@@ -43,6 +44,7 @@ namespace Commands
             {
                 case Help: SendHelp(handler, CurUser); break;
                 case List: ShowUsersList(handler, CurUser, Params); break;
+                case ListBin: ShowUsersBinList(handler, CurUser, Params); break;
                 case ActiveUsersList: ShowActiveUsersList(handler, CurUser, Params); break;
                 case Add: AddUser(handler, CurUser, Params); break;
                 case Update: UpdateUser(handler, CurUser, Params); break;
@@ -160,6 +162,79 @@ Parameters may be combined.");
                 Out.Add(msg);
             }
             CurUser.Transport.SimpleMsg(handler, Out);
+        }
+
+        /// <summary>
+        /// Показать список пользователей в бинарном виде в виде UserTransport
+        /// </summary>
+        /// <param name="handler"></param>
+        /// <param name="CurUser"></param>
+        /// <param name="Params"></param>
+        private void ShowUsersBinList(Socket handler, User CurUser, string[] Params)
+        {
+            // Взять всё из журнала и...
+            string Query = "SELECT `id` FROM `persons`";
+
+            // Начальная инициация переменных, чтобы из IF(){} вышли
+            string ID = "";
+            string Surname = "";
+            string Laboratory = "";
+            string Permissions = "";
+            string Login = "";
+            string Limit = "100";
+
+            // Посмотрим все доп. параметры
+            for (int i = 0; i < Params.Count(); i++)
+            {
+                string[] Param = Params[i].ToLower().Split(' '); // Доп. параметр от значения отделяется пробелом
+                if (Param[0] == "id") ID = SimpleParam(Param);                    // Показать пользователей по ID
+                if (Param[0] == "surname") Surname = SimpleParam(Param);          // Показать пользователей по фамилии
+                if (Param[0] == "laboratory") Laboratory = SimpleParam(Param);    // Показать пользователей по лаборатории
+                if (Param[0] == "permissions") Permissions = SimpleParam(Param);  // Показать пользователей по правам
+                if (Param[0] == "login") Login = SimpleParam(Param);              // Показать пользователей по логину
+                if (Param[0] == "limit") Limit = SimpleParam(Param);              // Показать конкретное число пользователей
+            }
+
+            // WHERE будет всегда – показываем только неудалённых
+            Query += "\nWHERE (`active` = 1)";
+
+            //Выберем по фамилии
+            if (ID != "") Query += " AND (`id` = " + ID + ")";
+
+            //Выберем по фамилии
+            if (Surname != "") Query += " AND (`Surname` LIKE '%" + Surname + "%')";
+
+            //Выберем по лаборатории
+            if (Laboratory != "") Query += $" AND (`laboratory`={Laboratory})";
+
+            //Выберем по разрешениям
+            if (Permissions != "") Query += " AND (`permissions` = " + Permissions + ")";
+
+            //Выберем по логину
+            if (Login != "") Query += " AND (`login` LIKE '%" + Login + "%')";
+
+            // Покажем только тех, кого можно конкретному пользователю
+            Query += " AND (" + CurUser.GetUserListRermissions() + ")";
+
+
+            // Добавим обратную сортировку и лимит
+            Query += "\nORDER BY `Surname`\nLIMIT " + Limit + ";";
+
+            DataTable Res = DataBase.Query(Query);
+
+            // И пошлём всё пользователю.
+            
+            //Server Fail – quit date of restart
+            if (Res.Rows.Count == 0) SendMsg(handler, "Results not found");
+
+            for (int i = 0; i < Res.Rows.Count; i++)
+            {
+                CurUser.Transport.SendBinaryData(handler, 
+                    Encoding.UTF8.GetBytes( 
+                        new User(Res.Rows[i].ItemArray[0].ToString(), DataBase).GetTransport().ToSOAP()));
+            };
+
+            CurUser.Transport.SendBinaryData(handler, new byte[1] { 0 });
         }
 
         /// <summary>
@@ -324,6 +399,7 @@ or
             string OldPassword = "";
             string Permissions = "";
             string Laboratory = "";
+            string LaboratoryID = "";
             string Job = "";
 
             // Ищем данные
@@ -333,7 +409,7 @@ or
 
                 if (Param[0] == "login") ULogin = SimpleParam(Param);
                 if (Param[0] == "name") Name = SimpleParam(Param);
-                if (Param[0] == "second.name") FName = SimpleParam(Param);
+                if (Param[0] == "second_name") FName = SimpleParam(Param);
                 if (Param[0] == "surname") Surname = SimpleParam(Param);
                 if (Param[0] == "newlogin") LoginN = SimpleParam(Param);
                 if (Param[0] == "oldpassword") OldPassword = SimpleParam(Param);
@@ -341,6 +417,7 @@ or
                 if (Param[0] == "confirm") CPassword = SimpleParam(Param);
                 if (Param[0] == "permissions") Permissions = SimpleParam(Param);
                 if (Param[0] == "laboratory") Laboratory = SimpleParam(Param);
+                if (Param[0] == "laboratory_id") LaboratoryID = SimpleParam(Param);
                 if (Param[0] == "job") Job = SimpleParam(Param);
 
                 // Помощь
@@ -365,6 +442,7 @@ or
    - 10 - Administrator's right. Able to add and get all institute's molecules. Able to rewind queries statuses. Able to work with user list. Able to direct work with database. Able to work with console.
    - 11 - Manager. Able to add and get all institute's molecules. Able to rewind queries statuses.
  - laboratory [Abbr.] - laboratory's abbreviation.
+ - laboratory_id [ID] - laboratory's number in DB.
  - job [Name] - person's job.");
                     return;
                 }
@@ -373,12 +451,12 @@ or
 
             // Проверяем, все ли нужные данные есть
             if (ULogin == "") { CurUser.Transport.SimpleMsg(handler, "Error: No login of user to change information. Use \"login\" parameter."); return; }
-            int LabNum = -1;
-            if (Laboratory != "")
+            int LabNum = LaboratoryID == "" ? -1 : Convert.ToInt32(LaboratoryID);
+            if (Laboratory != "" )
             {
                 DataTable DT = DataBase.Query("SELECT `id` FROM `laboratory` WHERE `abbr`='" + Laboratory + "' LIMIT 1;");
                 if (DT.Rows.Count == 0) { CurUser.Transport.SimpleMsg(handler, "Error: Laboratory not found"); return; };
-                LabNum = (int)DT.Rows[0].ItemArray[0];
+                LabNum = LabNum == -1 ? (int)DT.Rows[0].ItemArray[0] : LabNum;
             }
 
             // Проверка корректности введённых данных
@@ -389,7 +467,7 @@ or
                 if (Password != CPassword)
                 { CurUser.Transport.SimpleMsg(handler, "Error: \"password\" and \"confirm\" should be the similar"); return; }
             if (LabNum != -1)
-                if (DataBase.RecordsCount("laboratory", "`id`=" + LabNum.ToString() + "") == 0)
+                if (DataBase.RecordsCount("laboratory", $"`id`={LabNum.ToString()}") == 0)
                 { CurUser.Transport.SimpleMsg(handler, "Error: Laboratory not found"); return; };
             List<string> id_list = DataBase.QueryOne("SELECT `id` FROM `persons` WHERE `login` = '" + ULogin + "' LIMIT 1;");
             if (id_list == null) { CurUser.Transport.SimpleMsg(handler, "Error: No such login of user to change information."); return; }
@@ -416,7 +494,7 @@ or
             if (Permissions != "")
                 if (!UserToChange.SetRights(Convert.ToInt32(Permissions)))
                 { CurUser.Transport.SimpleMsg(handler, "Error: Unable to change permissions."); return; };
-            if (Laboratory != "")
+            if (LabNum != -1)
                 if (!UserToChange.SetLaboratory(LabNum))
                 { CurUser.Transport.SimpleMsg(handler, "Error: Unable to change laboratory."); return; };
             if (Job != "")
@@ -473,8 +551,10 @@ or
 
                 // Объявляем параметры
                 string ULogin = "";
+                string ID = "";
 
                 if (Param[0] == "login") ULogin = Param[1].Replace("\n", "").Replace("\r", "");
+                if (Param[0] == "id") ID = Param[1].Replace("\n", "").Replace("\r", "");
                 // Помощь
                 if (Param[0] == "help")
                 {
@@ -483,12 +563,14 @@ or
                 }
 
                 // Проверяем, все ли нужные данные есть
-                if (ULogin == "") { Users_Remove_Help(handler, CurUser); return; }
-                List<string> id_list = DataBase.QueryOne("SELECT `id` FROM `persons` WHERE `login` = '" + ULogin + "' LIMIT 1;");
+                if (ULogin == "" && ID == "") { Users_Remove_Help(handler, CurUser); return; }
+                string id_list = ID != "" 
+                        ? ID
+                        : DataBase.QueryOne($"SELECT `id` FROM `persons` WHERE `login` = '{ULogin}' LIMIT 1;")[0];
                 if (id_list == null) { CurUser.Transport.SimpleMsg(handler, "Error: No such login of user to change information."); return; }
 
                 // Ищем пользователя.
-                User UserToChange = new User(id_list[0], DataBase);
+                User UserToChange = new User(id_list, DataBase);
                 UserToChange.SetActive(false);
 
                 // И отошлём информацию, что всё OK
